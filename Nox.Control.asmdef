@@ -1,0 +1,19 @@
+{
+    "name": "Nox.Control",
+    "rootNamespace": "",
+    "references": [
+        "Nox.CCK",
+        "UniTask",
+        "Nox.Network",
+        "Nox.SDK.Control"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

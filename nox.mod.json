@@ -1,0 +1,36 @@
+{
+  "type": "mod",
+  "id": "nox.control",
+  "provides": [
+    "control"
+  ],
+  "name": "External Control",
+  "version": "1.0.0",
+  "description": "Advanced control system to make external integrations easier.",
+  "license": "GPL-3.0",
+  "icon": null,
+  "contact": {
+    "email": "hactazia@gmail.com",
+    "source": "https://github.com/AtelierVR/api.nox.control",
+    "website": "https://nox.hactazia.fr/",
+    "issues": "https://github.com/AtelierVR/api.nox.control/issues"
+  },
+  "authors": [
+    {
+      "name": "Hactazia",
+      "email": "hactazia@gmail.com",
+      "website": "https://hactazia.fr/"
+    }
+  ],
+  "contributors": [],
+  "relations": [],
+  "entrypoints": {
+    "main": [
+      "Nox.Control.Main"
+    ]
+  },
+  "references": [],
+  "sides": [],
+  "permissions": [],
+  "kernel": true
+}
