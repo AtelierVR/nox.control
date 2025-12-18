@@ -2,39 +2,44 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using Cysharp.Threading.Tasks;
 using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
 using Nox.Control.Handlers;
+using Nox.Control.Server;
 using Nox.SDK.Control;
 using EventHandler = Nox.Control.Handlers.EventHandler;
 
 namespace Nox.Control {
 	public class Main : IMainModInitializer {
-		internal static WebSocketServer Server;
-		internal static MainModCoreAPI  CoreAPI;
+		internal static WebSocket      Server;
+		internal static MainModCoreAPI CoreAPI;
 
 		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 
 		public void OnInitializeMain(MainModCoreAPI api) {
 			CoreAPI = api;
-			Reload();
+			ReloadAsync().Forget();
 			LoggerHandler.Listen();
 			_events = new[] { api.EventAPI.Subscribe(null, EventHandler.OnEvent) };
 		}
 
-		private static void Reload() {
+		private static async UniTaskVoid ReloadAsync() {
 			if (Server != null) {
 				Server.Dispose();
 				Server = null;
+
+				// Attendre un peu pour s'assurer que toutes les tâches asynchrones sont terminées
+				await UniTask.Delay(100);
 			}
 
 			var address       = IPAddress.Parse(Config.Load().Get("settings.control.address", "0.0.0.0"));
 			var preferredPort = Config.Load().Get("settings.control.port", 8000);
 			var port          = IsUsablePort(preferredPort, GetFreePort());
 
-			Server = new WebSocketServer(address, port);
+			Server = new WebSocket(address, port);
 
 			Server.OnClientConnected.AddListener(OnClientConnected);
 			Server.OnClientDisconnected.AddListener(OnClientDisconnected);
@@ -50,7 +55,7 @@ namespace Nox.Control {
 				var freePort = GetFreePort();
 				if (freePort != port) {
 					CoreAPI.LoggerAPI.Log($"Retrying with alternative port {freePort}...");
-					Server = new WebSocketServer(address, freePort);
+					Server = new WebSocket(address, freePort);
 					Server.OnClientConnected.AddListener(OnClientConnected);
 					Server.OnClientDisconnected.AddListener(OnClientDisconnected);
 					Server.OnEventReceived.AddListener(OnDataReceived);
@@ -101,11 +106,19 @@ namespace Nox.Control {
 				foreach (var sub in _events)
 					CoreAPI.EventAPI.Unsubscribe(sub);
 				LoggerHandler.Dispose();
-				if (Server == null) return;
-				var port = Server.GetPort();
-				Server.Dispose();
-				CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port}");
-				Server = null;
+
+				if (Server != null) {
+					var port = Server.GetPort();
+
+					// Remove all listeners before disposing to avoid calls during dispose
+					Server.OnClientConnected.RemoveAllListeners();
+					Server.OnClientDisconnected.RemoveAllListeners();
+					Server.OnEventReceived.RemoveAllListeners();
+
+					Server.Dispose();
+					CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port}");
+					Server = null;
+				}
 			} catch (Exception ex) {
 				CoreAPI?.LoggerAPI.LogError($"Error disposing Control Server: {ex.Message}");
 			} finally {
