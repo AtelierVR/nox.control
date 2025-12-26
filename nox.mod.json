@@ -30,7 +30,6 @@
     ]
   },
   "references": [],
-  "sides": [],
-  "permissions": [],
-  "kernel": true
+  
+  "permissions": []
 }

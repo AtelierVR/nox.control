@@ -15,11 +15,11 @@ using EventHandler = Nox.Control.Handlers.EventHandler;
 namespace Nox.Control {
 	public class Main : IMainModInitializer {
 		internal static WebSocket      Server;
-		internal static MainModCoreAPI CoreAPI;
+		internal static IMainModCoreAPI CoreAPI;
 
 		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 
-		public void OnInitializeMain(MainModCoreAPI api) {
+		public void OnInitializeMain(IMainModCoreAPI api) {
 			CoreAPI = api;
 			ReloadAsync().Forget();
 			LoggerHandler.Listen();

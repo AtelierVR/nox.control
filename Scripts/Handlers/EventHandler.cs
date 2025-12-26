@@ -10,8 +10,6 @@ using Nox.CCK.Utils;
 namespace Nox.Control.Handlers {
 	public class EventHandler {
 		public static void OnEvent(EventData context) {
-			if (Main.Server == null || !Main.Server.IsRunning()) return;
-			
 			var clients = Main.Server.GetClients();
 
 			var data = new List<JToken>();
@@ -43,10 +41,8 @@ namespace Nox.Control.Handlers {
 			select flag.ToString().ToSnakeCase()
 			).ToArray();
 			
-			foreach (var client in clients) {
-				if (client.IsConnected())
-					client.Send("event", context.EventName, context.Source.GetMetadata().GetId(), data.ToArray(), channels).Forget();
-			}
+			foreach (var client in clients)
+				client.Send("event", context.EventName, context.Source.GetMetadata().GetId(), data.ToArray(), channels).Forget();
 		}
 	}
 }

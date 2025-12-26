@@ -44,23 +44,15 @@ namespace Nox.Control.Handlers {
 
 		
 		private static void OnLog(LogType type, string message, string tag, Object context) {
-			if (Main.Server == null || !Main.Server.IsRunning()) return;
-			
 			var clients = Main.Server.GetClients();
-			foreach (var client in clients) {
-				if (client.IsConnected())
-					client.Send("logger:log", type.ToString(), tag, message).Forget();
-			}
+			foreach (var client in clients)
+				client.Send("logger:log", type.ToString(), tag, message).Forget();
 		}
 
 		private static void OnProgress(bool active, string title, string message, float progress) {
-			if (Main.Server == null || !Main.Server.IsRunning()) return;
-			
 			var clients = Main.Server.GetClients();
-			foreach (var client in clients) {
-				if (client.IsConnected())
-					client.Send("logger:progress", active, title, message, progress).Forget();
-			}
+			foreach (var client in clients)
+				client.Send("logger:progress", active, title, message, progress).Forget();
 		}
 
 		public static void Dispose() {

@@ -14,15 +14,20 @@ namespace Nox.Control.Server {
 		private readonly int             _port;
 		private          bool            _isRunning;
 		public           bool            IsDisposing;
+		private          MdnsService     _mdnsService;
+		private readonly bool            _enableMdns;
+		private readonly string          _mdnsServiceName;
 
 		public readonly UnityEvent<Client>                   OnClientConnected    = new();
 		public readonly UnityEvent<Client>                   OnClientDisconnected = new();
 		public readonly UnityEvent<Client, string, object[]> OnEventReceived      = new();
 
-		public WebSocket(IPAddress address, int port) {
-			_address   = address.ToString();
-			_port      = port;
-			_implement = new WebSocketServer(address, _port);
+		public WebSocket(IPAddress address, int port, bool enableMdns = true, string mdnsServiceName = "Nox Control Server") {
+			_address         = address.ToString();
+			_port            = port;
+			_enableMdns      = enableMdns;
+			_mdnsServiceName = mdnsServiceName;
+			_implement       = new WebSocketServer(address, _port);
 			_implement.AddWebSocketService<Service>("/", OnServiceRegister);
 		}
 
@@ -40,6 +45,21 @@ namespace Nox.Control.Server {
 				_implement.Start();
 				_isRunning = true;
 				Logger.Log($"Started on {_address}:{_port}", tag: nameof(WebSocket));
+
+				// Start mDNS advertising if enabled
+				if (_enableMdns) {
+					try {
+						_mdnsService = new MdnsService(
+							_mdnsServiceName, "_nctrl._tcp", (ushort)_port,
+							$"address={_address}",
+							$"protocol=websocket",
+							$"version=1.0"
+						);
+						_mdnsService.Start();
+					} catch (Exception mdnsEx) {
+						Logger.LogError(new Exception("Failed to start mDNS advertising (server will continue without it)", mdnsEx), tag: nameof(WebSocket));
+					}
+				}
 			} catch (Exception ex) {
 				Logger.LogException(new Exception($"Failed to start server on {_address}:{_port}", ex), tag: nameof(WebSocket));
 				throw;
@@ -52,8 +72,17 @@ namespace Nox.Control.Server {
 			_isRunning  = false;
 
 			try {
-				// Disconnect all clients first
-				foreach (var client in GetClients()) 
+				// Stop mDNS advertising first
+				try {
+					_mdnsService?.Stop();
+					_mdnsService?.Dispose();
+					_mdnsService = null;
+				} catch (Exception ex) {
+					Logger.LogError(new Exception("Error stopping mDNS service", ex), tag: nameof(WebSocket));
+				}
+
+				// Disconnect all clients
+				foreach (var client in GetClients())
 					try {
 						client.Close().Forget();
 					} catch (Exception ex) {
