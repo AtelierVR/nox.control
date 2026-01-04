@@ -29,7 +29,11 @@
       "Nox.Control.Main"
     ]
   },
+  "contraints": [
+    {
+      "type": "first"
+    }
+  ],
   "references": [],
-  
   "permissions": []
 }
