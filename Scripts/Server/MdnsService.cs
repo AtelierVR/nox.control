@@ -89,7 +89,7 @@ namespace Nox.Control.Server {
 				_isAdvertising = true;
 				Logger.Log($"mDNS advertising started for '{_serviceName}' (Port: {_port})", tag: nameof(MdnsService));
 			} catch (Exception ex) {
-				Logger.LogException(new Exception("Failed to start mDNS advertising", ex), tag: nameof(MdnsService));
+				Logger.LogError(new Exception("Failed to start mDNS advertising", ex), tag: nameof(MdnsService));
 				throw;
 			}
 		}

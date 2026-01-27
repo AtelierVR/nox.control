@@ -61,7 +61,7 @@ namespace Nox.Control.Server {
 					}
 				}
 			} catch (Exception ex) {
-				Logger.LogException(new Exception($"Failed to start server on {_address}:{_port}", ex), tag: nameof(WebSocket));
+				Logger.LogError(new Exception($"Failed to start server on {_address}:{_port}", ex), tag: nameof(WebSocket));
 				throw;
 			}
 		}
