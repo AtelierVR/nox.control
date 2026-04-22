@@ -34,7 +34,7 @@ namespace Nox.Control.Handlers {
 		internal class ComponentInfo {
 			public ComponentInfo(Component component) {
 				type = component.GetType().FullName;
-				id   = component.GetInstanceID();
+				id   = component.GetEntityId().GetHashCode();
 				var list = new List<PropertyInfo>();
 				foreach (var property in component.GetType().GetProperties()) {
 					if (!property.CanRead) continue;
@@ -46,7 +46,7 @@ namespace Nox.Control.Handlers {
 								name = property.Name,
 								type = property.PropertyType.FullName,
 								value = value switch {
-									Object obj => $"{obj.name} ({obj.GetInstanceID()})",
+									Object obj => $"{obj.name} ({obj.GetEntityId().GetHashCode()})",
 									null       => JValue.CreateNull(),
 									_          => JToken.FromObject(value)
 								},
@@ -66,7 +66,7 @@ namespace Nox.Control.Handlers {
 								name = field.Name,
 								type = field.FieldType.FullName,
 								value = value switch {
-									Object obj => $"{obj.name} ({obj.GetInstanceID()})",
+									Object obj => $"{obj.name} ({obj.GetEntityId().GetHashCode()})",
 									null       => JValue.CreateNull(),
 									_          => JToken.FromObject(value)
 								},
@@ -112,7 +112,7 @@ namespace Nox.Control.Handlers {
 		internal class SceneNode {
 			public SceneNode(GameObject gameObject) {
 				name = gameObject.name;
-				id   = gameObject.GetInstanceID();
+				id   = gameObject.GetEntityId().GetHashCode();
 				var children = new List<SceneNode>();
 
 				for (var i = 0; i < gameObject.transform.childCount; i++) {
@@ -218,7 +218,7 @@ namespace Nox.Control.Handlers {
 
 					void Traverse(int index, IEnumerable<GameObject> gameObjects) {
 						foreach (var go in gameObjects) {
-							if (go.GetInstanceID() != index) continue;
+							if (go.GetEntityId().GetHashCode() != index) continue;
 							o = go;
 							return;
 						}
