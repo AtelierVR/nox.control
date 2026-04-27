@@ -5,13 +5,17 @@
         "Nox.CCK",
         "UniTask",
         "Nox.Network",
-        "Nox.SDK.Control"
+        "Nox.SDK.Control",
+        "Newtonsoft.Json"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "websocket-sharp.dll",
+        "Newtonsoft.Json.dll"
+    ],
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
