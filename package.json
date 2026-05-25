@@ -1,5 +1,6 @@
 {
   "name": "nox.control",
   "displayName": "Nox - External Control",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "description": "Advanced control system for external integrations and automation."
 }
