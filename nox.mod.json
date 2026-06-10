@@ -22,8 +22,6 @@
       "website": "https://hactazia.fr/"
     }
   ],
-  "contributors": [],
-  "relations": [],
   "entrypoints": {
     "main": [
       "Nox.Control.Main"
@@ -33,7 +31,5 @@
     {
       "type": "first"
     }
-  ],
-  "references": [],
-  "permissions": []
+  ]
 }

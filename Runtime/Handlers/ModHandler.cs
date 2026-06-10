@@ -18,7 +18,10 @@ namespace Nox.Control.Handlers {
 							provides = meta.GetProvides(),
 							version  = meta.GetVersion()?.ToString() ?? "0.0.0",
 							loaded   = mod.IsLoaded(),
-							entries  = meta.GetEntryPoints().GetAll(),
+							entries  = meta.GetEntryPoints().All.ToDictionary(
+								kv => kv.Key,
+								kv => kv.Value.Select(e => e.FullName).ToArray()
+							),
 							instances = mod.GetInstances<IModInitializer>()
 								.Select(inst => inst.GetType().FullName)
 								.ToArray(),
@@ -47,7 +50,10 @@ namespace Nox.Control.Handlers {
 						provides = meta.GetProvides(),
 						version  = meta.GetVersion()?.ToString() ?? "0.0.0",
 						loaded   = mod.IsLoaded(),
-						entries  = meta.GetEntryPoints().GetAll(),
+						entries  = meta.GetEntryPoints().All.ToDictionary(
+							kv => kv.Key,
+							kv => kv.Value.Select(e => e.FullName).ToArray()
+						),
 						instances = mod.GetInstances<IModInitializer>()
 							.Select(inst => inst.GetType().FullName)
 							.ToArray(),
