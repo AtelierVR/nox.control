@@ -1,33 +1,72 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using Nox.CCK.Control;
 using Nox.CCK.Mods.Cores;
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
-using Nox.Control.Handlers;
+using Nox.Control.Runtime.Handlers;
+using Nox.Control.Runtime.Server;
 using Nox.Control.Server;
-using Nox.SDK.Control;
-using EventHandler = Nox.Control.Handlers.EventHandler;
+using EventHandler = Nox.Control.Runtime.Handlers.EventHandler;
 
-namespace Nox.Control {
-	public class Main : IMainModInitializer {
-		internal static WebSocket      Server;
-		internal static IMainModCoreAPI CoreAPI;
+namespace Nox.Control.Runtime {
+	public class Main : IMainModInitializer, IControlAPI {
+		internal static WebSocket        Server;
+		internal static HttpService      Http;
+		internal static IMainModCoreAPI  CoreAPI;
+		internal static Main             Instance;
 
+		private OperationManager _manager;
 		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 
+		private LoggerHandler _logger;
+
+		private (uint, IOperator)[] _operators = Array.Empty<(uint, IOperator)>();
+
 		public void OnInitializeMain(IMainModCoreAPI api) {
-			CoreAPI = api;
+			CoreAPI  = api;
+			Instance = this;
+			_manager = new OperationManager();
+
+			_logger = new LoggerHandler();
+
+			// Register all operators (like terminal's _defaultCommands)
+			_operators = new (uint, IOperator)[] {
+				(0u, new ConfigGet()),
+				(0u, new ConfigSet()),
+				(0u, new ConfigReload()),
+				(0u, new HierarchyScenesList()),
+				(0u, new HierarchyScenesGet()),
+				(0u, new ModList()),
+				(0u, new ModGet()),
+				(0u, _logger),
+				#if UNITY_EDITOR
+				(0u, new EditorGetPlayState()),
+				(0u, new EditorPlay()),
+				(0u, new EditorStop()),
+				#endif
+			};
+
+			for (var i = 0; i < _operators.Length; i++)
+				_operators[i].Item1 = _manager.Register(_operators[i].Item2);
+
 			ReloadAsync().Forget();
-			LoggerHandler.Listen();
-			_events = new[] { api.EventAPI.Subscribe(null, EventHandler.OnEvent) };
+			_logger.Listen();
+			_events = new[] {
+				api.EventAPI.Subscribe(null, EventHandler.OnEvent)
+			};
 		}
 
 		private static async UniTaskVoid ReloadAsync() {
 			if (Server != null) {
+				Http?.Stop();
+				Http = null;
 				Server.Dispose();
 				Server = null;
 
@@ -35,11 +74,13 @@ namespace Nox.Control {
 				await UniTask.Delay(100);
 			}
 
-			var address       = IPAddress.Parse(Config.Load().Get("settings.control.address", "0.0.0.0"));
-			var preferredPort = Config.Load().Get("settings.control.port", 8000);
-			var port          = IsUsablePort(preferredPort, GetFreePort());
+			var cfg            = Config.Load();
+			var address        = IPAddress.Parse(cfg.Get("settings.control.address", IPAddress.Any.ToString()));
+			var preferredPort  = cfg.Get("settings.control.port", 8000);
+			var port           = IsUsablePort(preferredPort, GetFreePort());
+			var mcpEnabled     = cfg.Get("settings.control.mcp", true);
 
-			Server = new WebSocket(address, port);
+			Server = new WebSocket(address, port, enableMcp: mcpEnabled);
 
 			Server.OnClientConnected.AddListener(OnClientConnected);
 			Server.OnClientDisconnected.AddListener(OnClientDisconnected);
@@ -48,6 +89,11 @@ namespace Nox.Control {
 			try {
 				Server.Listen();
 				CoreAPI.LoggerAPI.Log($"Control Server started on port {Server.GetPort()}");
+
+				// Start HTTP API on port + 1
+				var httpPort = Config.Load().Get("settings.control.http_port", port + 1);
+				Http = new HttpService(httpPort);
+				Http.Start();
 			} catch (SocketException ex) {
 				CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on port {port}: {ex.Message}");
 
@@ -55,7 +101,7 @@ namespace Nox.Control {
 				var freePort = GetFreePort();
 				if (freePort != port) {
 					CoreAPI.LoggerAPI.Log($"Retrying with alternative port {freePort}...");
-					Server = new WebSocket(address, freePort);
+					Server = new WebSocket(address, freePort, enableMcp: mcpEnabled);
 					Server.OnClientConnected.AddListener(OnClientConnected);
 					Server.OnClientDisconnected.AddListener(OnClientDisconnected);
 					Server.OnEventReceived.AddListener(OnDataReceived);
@@ -63,6 +109,10 @@ namespace Nox.Control {
 					try {
 						Server.Listen();
 						CoreAPI.LoggerAPI.Log($"Control Server started on alternative port {Server.GetPort()}");
+
+						var httpPort = Config.Load().Get("settings.control.http_port", freePort + 1);
+						Http = new HttpService(httpPort);
+						Http.Start();
 					} catch (SocketException retryEx) {
 						CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on alternative port {freePort}: {retryEx.Message}");
 						Server = null;
@@ -80,13 +130,14 @@ namespace Nox.Control {
 			List<object> data = new() { arg0, arg1 };
 			data.AddRange(arg2);
 			CoreAPI.EventAPI.Emit("control:data", data.ToArray());
-			ConfigHandler.Handle(arg0, arg1, arg2);
-			HierarchyHandler.Handle(arg0, arg1, arg2);
-			ModHandler.Handle(arg0, arg1, arg2);
-			LoggerHandler.Handle(arg0, arg1, arg2);
-			#if UNITY_EDITOR
-			EditorHandler.Handle(arg0, arg1, arg2);
-			#endif
+
+			// Route to the matching operator via ExecuteAsync (same path as MCP)
+			var jArgs = arg2.Length > 0
+				? JToken.FromObject(arg2.Length == 1 ? arg2[0] : arg2)
+				: JObject.Parse("{}");
+			Instance.ExecuteAsync(arg1, jArgs)
+				.ContinueWith(result => arg0.Send(arg1, result).Forget())
+				.Forget();
 		}
 
 		private static void OnClientDisconnected(IClient arg0) {
@@ -105,7 +156,15 @@ namespace Nox.Control {
 			try {
 				foreach (var sub in _events)
 					CoreAPI.EventAPI.Unsubscribe(sub);
-				LoggerHandler.Dispose();
+				_logger?.Dispose();
+
+				// Unregister all operators
+				for (var i = 0; i < _operators.Length; i++)
+					_manager.Unregister(_operators[i].Item1);
+				_operators = Array.Empty<(uint, IOperator)>();
+
+				Http?.Stop();
+				Http = null;
 
 				if (Server != null) {
 					var port = Server.GetPort();
@@ -122,7 +181,40 @@ namespace Nox.Control {
 			} catch (Exception ex) {
 				CoreAPI?.LoggerAPI.LogError($"Error disposing Control Server: {ex.Message}");
 			} finally {
-				CoreAPI = null;
+				CoreAPI  = null;
+				Instance = null;
+				_manager = null;
+			}
+		}
+
+		#region IControlAPI
+
+		public IOperator[] GetRegistered()
+			=> _manager.Operators
+				.ConvertAll(o => o.Item2)
+				.ToArray();
+
+		public uint Register(IOperator op)
+			=> _manager.Register(op);
+
+		public void Unregister(uint id)
+			=> _manager.Unregister(id);
+
+		#endregion
+
+		public async UniTask<JToken> ExecuteAsync(string name, JToken args) {
+			var op = _manager.Operators
+				.Select(o => o.Item2)
+				.FirstOrDefault(o => o.Name == name) 
+				?? throw new KeyNotFoundException($"Operator '{name}' not found");
+
+            try {
+				var input = new OperatorInput(args);
+				var output = await op.Execute(input);
+				return JObject.FromObject(output);
+			} catch (Exception ex) {
+				Logger.LogError($"Operator '{name}' failed: {ex.Message}", tag: nameof(OperationManager));
+				return JObject.FromObject(new { error = ex.Message });
 			}
 		}
 

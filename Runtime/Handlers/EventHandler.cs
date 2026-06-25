@@ -7,8 +7,8 @@ using Newtonsoft.Json.Linq;
 using Nox.CCK.Mods.Events;
 using Nox.CCK.Utils;
 
-namespace Nox.Control.Handlers {
-	public class EventHandler {
+namespace Nox.Control.Runtime.Handlers  {
+	public static class EventHandler {
 		public static void OnEvent(EventData context) {
 			var clients = Main.Server.GetClients();
 

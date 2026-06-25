@@ -1,11 +1,12 @@
 {
-    "name": "Nox.Control",
+    "name": "Nox.Control.Runtime",
     "rootNamespace": "",
     "references": [
         "Nox.CCK",
         "UniTask",
         "Nox.Network",
-        "Nox.SDK.Control",
+        "Nox.Control",
+        "Nox.CCK.Control",
         "Newtonsoft.Json"
     ],
     "includePlatforms": [],

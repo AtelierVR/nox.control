@@ -1,5 +1,5 @@
 {
-  "name": "Nox.SDK.Control",
+  "name": "Nox.Control",
   "rootNamespace": "",
   "references": [
     "UniTask"

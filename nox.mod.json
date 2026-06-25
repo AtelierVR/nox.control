@@ -24,7 +24,7 @@
   ],
   "entrypoints": {
     "main": [
-      "Nox.Control.Main"
+      "Nox.Control.Runtime.Main"
     ]
   },
   "contraints": [

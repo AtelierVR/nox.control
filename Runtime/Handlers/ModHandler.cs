@@ -1,68 +1,94 @@
-using System.Linq;
+using System;
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
-using Nox.CCK.Mods.Initializers;
-using Nox.SDK.Control;
+using Newtonsoft.Json;
+using Nox.CCK.Control;
+using Nox.CCK.Mods;
 
-namespace Nox.Control.Handlers {
-	public class ModHandler {
-		public static void Handle(IClient client, string ev, object[] args) {
-			switch (ev) {
-				case "mods:list": {
-					var mods     = Main.CoreAPI.ModAPI.GetMods();
-					var modInfos = new object[mods.Length];
-					for (var i = 0; i < mods.Length; i++) {
-						var mod  = mods[i];
-						var meta = mod.GetMetadata();
-						modInfos[i] = new {
-							id       = meta.GetId(),
-							provides = meta.GetProvides(),
-							version  = meta.GetVersion()?.ToString() ?? "0.0.0",
-							loaded   = mod.IsLoaded(),
-							entries  = meta.GetEntryPoints().All.ToDictionary(
-								kv => kv.Key,
-								kv => kv.Value.Select(e => e.FullName).ToArray()
-							),
-							instances = mod.GetInstances<IModInitializer>()
-								.Select(inst => inst.GetType().FullName)
-								.ToArray(),
-						};
-					}
+namespace Nox.Control.Runtime.Handlers  {
+		public class ModList : IOperator {
+			public string Name => "mods_list";
+			public string Description => "List all loaded mods with their metadata.";
+			public ISchema Schema => new InputSchema();
 
-					client.Send("mods:list", modInfos).Forget();
-					break;
-				}
-				case "mods:get": {
-					var key = args.Length > 0 ? args[0]?.ToString() : null;
-					if (string.IsNullOrEmpty(key)) {
-						client.Send("mods:get", null).Forget();
-						break;
-					}
+			public async UniTask<IOutput> Execute(IInput _) {
+				await UniTask.Yield();
 
-					var mod  = Main.CoreAPI.ModAPI.GetMod(key);
-					var meta = mod?.GetMetadata();
-					if (mod == null) {
-						client.Send("mods:get", null).Forget();
-						break;
-					}
+				var api = Main.CoreAPI;
+				if (api == null)
+					return OperatorOutput.Error("CoreAPI not available");
 
-					var modInfo = new {
-						id       = meta.GetId(),
-						provides = meta.GetProvides(),
-						version  = meta.GetVersion()?.ToString() ?? "0.0.0",
-						loaded   = mod.IsLoaded(),
-						entries  = meta.GetEntryPoints().All.ToDictionary(
-							kv => kv.Key,
-							kv => kv.Value.Select(e => e.FullName).ToArray()
-						),
-						instances = mod.GetInstances<IModInitializer>()
-							.Select(inst => inst.GetType().FullName)
-							.ToArray(),
-					};
+				var mods = api.ModAPI.GetMods();
+				var results = new ModMetadata[mods.Length];
+				for(var i = 0; i < mods.Length; i++) 
+					results[i] = new ModMetadata(mods[i]);
 
-					client.Send("mods:get", modInfo).Forget();
-					break;
-				}
+				return OperatorOutput.Ok(results);
 			}
 		}
-	}
+
+		[Serializable]
+		public class ModMetadata {
+			public ModMetadata(IMod mod) {
+				var meta = mod.GetMetadata();
+				Id = meta.GetId();
+				Provides = meta.GetProvides();
+				Version = meta.GetVersion().ToString();
+				Loaded = mod.IsLoaded();
+
+				// Entries: map section name → array of FullName strings
+				var entryPoints = meta.GetEntryPoints().All;
+				Entries = new Dictionary<string, string[]>();
+				foreach (var kv in entryPoints) 
+					Entries[kv.Key] = Array.ConvertAll(kv.Value, e => e.FullName);
+
+				// Instances: if loaded, all entry point class names are considered instantiate
+				var allNames = new List<string>();
+				foreach (var kv in entryPoints)
+					foreach (var ep in kv.Value)
+						allNames.Add(ep.FullName);
+				Instances = allNames.ToArray();
+			}
+
+			[JsonProperty("id")]
+			public string Id = string.Empty;
+
+			[JsonProperty("provides")]
+			public string[] Provides = Array.Empty<string>();
+
+			[JsonProperty("version")]
+			public string Version = new Version().ToString();
+
+			[JsonProperty("loaded")]
+			public bool Loaded = false;
+
+			[JsonProperty("entries")]
+			public Dictionary<string, string[]> Entries = new();
+
+			[JsonProperty("instances")]
+			public string[] Instances = Array.Empty<string>();
+		}
+
+		public class ModGet : IOperator {
+			public string Name => "mods_get";
+			public string Description => "Get details about a specific mod by its ID.";
+			public ISchema Schema => new InputSchema()
+				.Property<string>("id", "The mod ID to look up.", true);
+
+			public async UniTask<IOutput> Execute(IInput args) {
+				await UniTask.Yield();
+
+				var api = Main.CoreAPI;
+				if (api == null)
+					return OperatorOutput.Error("CoreAPI not available");
+
+				var id = args.Get<string>("id", true);
+
+				var mod = api.ModAPI.GetMod(id);
+				if (mod == null)
+					return OperatorOutput.Error($"Mod '{id} not found.");
+
+				return OperatorOutput.Ok(new ModMetadata(mod));
+			}
+		}
 }

@@ -1,61 +1,94 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Cysharp.Threading.Tasks;
-using Nox.SDK.Control;
-using UnityEngine;
+using Nox.CCK.Control;
+using Nox.CCK.Utils;
 using Logger = Nox.CCK.Utils.Logger;
 using LogType = Nox.CCK.Utils.LogType;
 using Object = UnityEngine.Object;
 
-namespace Nox.Control.Handlers {
-	public class LoggerHandler {
-		public static void Listen() {
+namespace Nox.Control.Runtime.Handlers  {
+	[Serializable]
+	public class LogEntryData {
+		public string Type;
+		public string Tag;
+		public string Message;
+		public long   Timestamp;
+	}
+
+	[Serializable]
+	public class ProgressData {
+		public bool   Active;
+		public string Title;
+		public string Message;
+		public float  Progress;
+	}
+
+	public class LoggerHandler : IOperator {
+		public string Name
+			=> "logger_history";
+
+		public string Description
+			=> "Get log history since a given timestamp (Unix milliseconds).";
+
+		public ISchema Schema => new InputSchema()
+			.Property<long>("since", "Unix timestamp in milliseconds. Omit for all logs.");
+
+		public async UniTask<IOutput> Execute(IInput args) {
+			await UniTask.Yield();
+
+			var sinceMs = args.Get<long>("since");
+			var since = sinceMs > 0
+				? DateTimeOffset.FromUnixTimeMilliseconds(sinceMs).UtcDateTime
+				: DateTime.MinValue;
+
+			var logs = Logger.History
+				.Where(log => log.Timestamp >= since)
+				.Select(log => new LogEntryData {
+					Type      = log.Type.ToString().ToSnakeCase(),
+					Tag       = log.Tag,
+					Message   = StripRichText(log.Message),
+					Timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
+				}).ToArray();
+
+			return OperatorOutput.Ok(logs);
+		}
+
+		private static string StripRichText(string msg) {
+			if (string.IsNullOrEmpty(msg)) return msg;
+			return System.Text.RegularExpressions.Regex.Replace(msg, @"<[^>]*>", "");
+		}
+
+		public void Listen() {
 			Logger.OnProgress.AddListener(OnProgress);
 			Logger.OnLog.AddListener(OnLog);
 		}
 
-		public static void Handle(IClient client, string eventName, params object[] args) {
-			if (eventName != "logger:history") return;
-			var timestamp = args.Length > 0 && args[0] is int
-				? DateTimeOffset.FromUnixTimeMilliseconds(long.Parse(args[0].ToString())).UtcDateTime
-				: DateTime.MinValue;
-			SendHistory(client, timestamp).Forget();
+		private void OnLog(LogType type, string tag, string message, Object context) {
+			var entry = new LogEntryData {
+				Type      = type.ToString().ToSnakeCase(),
+				Tag       = tag,
+				Message   = StripRichText(message),
+				Timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
+			};
+			foreach (var c in Main.Server.GetClients())
+				c.Send("logger_log", entry)
+				.Forget();
 		}
 
-		private static async UniTaskVoid SendHistory(IClient client, DateTime since) {
-			var logs = Logger.History.Where(log => log.Timestamp >= since);
-			await client.Send(
-				"logger:history",
-				logs.Select(
-						log => new {
-							type      = log.Type.ToString(),
-							tag       = log.Tag,
-							message   = log.Message,
-							timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
-						}
-					)
-					.ToArray<object>()
-			);
+		private void OnProgress(bool active, string title, string message, float progress) {
+			var data = new ProgressData {
+				Active   = active,
+				Title    = title,
+				Message  = message,
+				Progress = progress
+			};
+			foreach (var c in Main.Server.GetClients())
+				c.Send("logger_progress", data)
+				.Forget();
 		}
 
-		
-		private static void OnLog(LogType type, string message, string tag, Object context) {
-			var clients = Main.Server.GetClients();
-			foreach (var client in clients)
-				client.Send("logger:log", type.ToString(), tag, message).Forget();
-		}
-
-		private static void OnProgress(bool active, string title, string message, float progress) {
-			var clients = Main.Server.GetClients();
-			foreach (var client in clients)
-				client.Send("logger:progress", active, title, message, progress).Forget();
-		}
-
-		public static void Dispose() {
+		public void Dispose() {
 			Logger.OnProgress.RemoveListener(OnProgress);
 			Logger.OnLog.RemoveListener(OnLog);
 		}

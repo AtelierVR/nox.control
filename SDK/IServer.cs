@@ -1,6 +1,6 @@
 using Cysharp.Threading.Tasks;
 
-namespace Nox.SDK.Control {
+namespace Nox.Control {
 	/// <summary>
 	/// Represents a server that can manage client connections.
 	/// </summary>

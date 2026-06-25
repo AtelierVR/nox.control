@@ -1,6 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <linker>
+	<assembly fullname="Nox.CCK.Control" preserve="all" />
 	<assembly fullname="Nox.Control" preserve="all" />
-	<assembly fullname="Nox.SDK.Control" preserve="all" />
+	<assembly fullname="Nox.Control.Runtime" preserve="all" />
+	<assembly fullname="Nox.Mods.Control" preserve="all" />
 	<assembly fullname="websocket-sharp" preserve="all" />
 </linker>

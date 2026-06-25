@@ -3,11 +3,11 @@ using System.Linq;
 using System.Net;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Utils;
-using Nox.SDK.Control;
+using Nox.Control.Runtime.Server.Mcp;
 using UnityEngine.Events;
 using WebSocketSharp.Server;
 
-namespace Nox.Control.Server {
+namespace Nox.Control.Runtime.Server {
 	public class WebSocket : IServer {
 		private readonly WebSocketServer _implement;
 		private readonly string          _address;
@@ -22,13 +22,22 @@ namespace Nox.Control.Server {
 		public readonly UnityEvent<Client>                   OnClientDisconnected = new();
 		public readonly UnityEvent<Client, string, object[]> OnEventReceived      = new();
 
-		public WebSocket(IPAddress address, int port, bool enableMdns = true, string mdnsServiceName = "Nox Control Server") {
-			_address         = address.ToString();
-			_port            = port;
-			_enableMdns      = enableMdns;
-			_mdnsServiceName = mdnsServiceName;
+		/// <summary>
+		/// Whether the MCP endpoint (/mcp) is enabled on this server.
+		/// </summary>
+		public bool EnableMcp { get; set; } = true;
+
+	public WebSocket(IPAddress address, int port, bool enableMdns = true, string mdnsServiceName = "Nox Control Server", bool enableMcp = true) {
+		_address         = address.ToString();
+		_port            = port;
+		_enableMdns      = enableMdns;
+		_mdnsServiceName = mdnsServiceName;
+		EnableMcp        = enableMcp;
 			_implement       = new WebSocketServer(address, _port);
 			_implement.AddWebSocketService<Service>("/", OnServiceRegister);
+
+			if (EnableMcp)
+				_implement.AddWebSocketService<McpService>("/mcp", OnMcpServiceRegister);
 		}
 
 		private void OnServiceRegister(Service behavior) {
@@ -36,6 +45,10 @@ namespace Nox.Control.Server {
 			behavior.OnOpenCallback    = OnClientConnected;
 			behavior.OnCloseCallback   = OnClientDisconnected;
 			behavior.OnMessageCallback = OnEventReceived;
+		}
+
+		private void OnMcpServiceRegister(McpService behavior) {
+			behavior.Server = this;
 		}
 
 		public void Listen() {

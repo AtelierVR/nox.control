@@ -3,11 +3,10 @@ using System.Net;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Nox.SDK.Control;
 using WebSocketSharp;
 using Logger = Nox.CCK.Utils.Logger;
 
-namespace Nox.Control.Server {
+namespace Nox.Control.Runtime.Server {
 	public class Client : IClient {
 		private readonly Service   _behavior;
 		private readonly WebSocket _server;

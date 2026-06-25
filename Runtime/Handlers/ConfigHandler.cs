@@ -1,41 +1,69 @@
 using Cysharp.Threading.Tasks;
+using Nox.CCK.Control;
 using Nox.CCK.Utils;
-using Nox.SDK.Control;
 
-namespace Nox.Control.Handlers {
-	public class ConfigHandler {
-		public static void Handle(IClient client, string ev, object[] args) {
-			switch (ev) {
-				case "config:get": {
-					var key = args.Length > 0 ? args[0]?.ToString() : null;
-					var cfg = Config.Load();
-					if (string.IsNullOrEmpty(key))
-						client.Send("config:get", "*", cfg.Get()).Forget();
-					else client.Send("config:get", key, cfg.Get(key)).Forget();
-					break;
-				}
-				case "config:set": {
-					if (args.Length < 2) {
-						client.Send("error", "config:set requires a key and a value").Forget();
-						return;
-					}
+namespace Nox.Control.Runtime.Handlers {
+    public class ConfigGet : IOperator
+    {
+        public string Name => "config_get";
+        public string Description => "Get a configuration value by key, or all values if key is '*' or omitted.";
+        public ISchema Schema => new InputSchema()
+            .Property<string>("key", "The configuration key (e.g. 'settings.control.port'), or '*' for all.");
 
-					var key   = args[0]?.ToString();
-					var value = args[1];
+        public async UniTask<IOutput> Execute(IInput args) {
+			await UniTask.Yield();
 
-					var cfg = Config.Load();
-					cfg.Set(key, value);
-					cfg.Save();
+            var key = args.Get<string>("key");
+            var cfg = Config.Load();
 
-					client.Send("config:get", key, cfg.Get(key)).Forget();
-					break;
-				}
-				case "config:reload": {
-					Config.Load(true);
-					client.Send("config:reload").Forget();
-					break;
-				}
-			}
-		}
-	}
+            if (string.IsNullOrEmpty(key) || key == "*") {
+                var all = cfg.Get();
+                return OperatorOutput.Ok(all);
+            }
+
+            return OperatorOutput.Ok(cfg.Get(key));
+        }
+    }
+
+    public class ConfigSet : IOperator
+    {
+        public string Name => "config_set";
+        public string Description => "Set a configuration value.";
+        public ISchema Schema => new InputSchema()
+            .Property<string>("key", "The configuration key.", true)
+            .Property<string>("value", "The value to set (any JSON type).", true);
+
+        public async UniTask<IOutput> Execute(IInput args) {
+			await UniTask.Yield();
+
+            var key = args.Get<string>("key", true);
+            var rVal = args.Get<object>("value", true);
+            var val = rVal is Newtonsoft.Json.Linq.JValue jv
+				? jv.Value
+				: rVal?.ToString();
+
+            var cfg = Config.Load();
+            cfg.Set(key, val);
+            cfg.Save();
+
+            return OperatorOutput.Ok(new {
+                key,
+				value = cfg.Get(key)
+			});
+        }
+    }
+
+    public class ConfigReload : IOperator
+    {
+        public string Name => "config_reload";
+        public string Description => "Reload configuration from disk.";
+        public ISchema Schema => new InputSchema();
+
+        public async UniTask<IOutput> Execute(IInput _) {
+			await UniTask.Yield();
+
+            Config.Load(true);
+            return OperatorOutput.Ok(new { reloaded = true });
+        }
+    }
 }

@@ -1,14 +1,11 @@
 using System;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
-using System.Text;
 using System.Threading;
-using System.Collections.Generic;
 using Nox.CCK.Utils;
 
-namespace Nox.Control.Server {
+namespace Nox.Control.Runtime.Server {
 	/// <summary>
 	/// Provides mDNS/DNS-SD service advertisement for WebSocket server
 	/// Uses native UDP sockets for Unity compatibility

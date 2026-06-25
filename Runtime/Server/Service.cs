@@ -6,7 +6,7 @@ using WebSocketSharp;
 using WebSocketSharp.Server;
 using Logger = Nox.CCK.Utils.Logger;
 
-namespace Nox.Control.Server {
+namespace Nox.Control.Runtime.Server {
 	public class Service : WebSocketBehavior {
 		public WebSocket                            Server;
 		public UnityEvent<Client>                   OnOpenCallback    = new();
