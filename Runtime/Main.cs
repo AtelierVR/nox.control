@@ -205,8 +205,10 @@ namespace Nox.Control.Runtime {
 		public async UniTask<JToken> ExecuteAsync(string name, JToken args) {
 			var op = _manager.Operators
 				.Select(o => o.Item2)
-				.FirstOrDefault(o => o.Name == name) 
-				?? throw new KeyNotFoundException($"Operator '{name}' not found");
+				.FirstOrDefault(o => o.Name == name);
+
+			if (op == null)
+				return JObject.FromObject(new { error = $"Operator '{name}' not found" });
 
             try {
 				var input = new OperatorInput(args);
