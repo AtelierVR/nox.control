@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 776389e82c640c44086d3baf10dd1c7b, type: 3}
+  m_Name: lang
+  m_EditorClassIdentifier: Nox.CCK::Nox.CCK.Language.LanguagePack
+  languages:
+  - IETF: en-US
+    entries:
+    - key: permission.config.read.description
+      value: "Read application configuration values"
+    - key: permission.config.write.description
+      value: "Modify application configuration values"
+    - key: permission.hierarchy.read.description
+      value: "Read scene hierarchy and GameObject data"
+    - key: permission.mods.read.description
+      value: "Read loaded mod information"
+    - key: permission.editor.control.description
+      value: "Control Unity Editor play/stop state"
+    - key: permission.logger.read.description
+      value: "Read log history and receive live logs"
+    - key: permission.events.read.description
+      value: "Receive real-time mod events"
+    - key: permission.control.admin.description
+      value: "Manage websocket permissions and control access"
+  - IETF: fr-FR
+    entries:
+    - key: permission.config.read.description
+      value: "Lire les valeurs de configuration de l'application"
+    - key: permission.config.write.description
+      value: "Modifier les valeurs de configuration de l'application"
+    - key: permission.hierarchy.read.description
+      value: "Lire la hiérarchie des scènes et les données des GameObjects"
+    - key: permission.mods.read.description
+      value: "Lire les informations des mods chargés"
+    - key: permission.editor.control.description
+      value: "Contrôler l'état Play/Stop de l'éditeur Unity"
+    - key: permission.logger.read.description
+      value: "Lire l'historique des logs et recevoir les logs en direct"
+    - key: permission.events.read.description
+      value: "Recevoir les événements des mods en temps réel"
+    - key: permission.control.admin.description
+      value: "Gérer les permissions WebSocket et contrôler les accès"

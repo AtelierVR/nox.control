@@ -31,6 +31,8 @@ namespace Nox.Control.Runtime.Handlers  {
 		public string Description
 			=> "Get log history since a given timestamp (Unix milliseconds).";
 
+		public string[] RequiredPermissions => new[] { "logger:read" };
+
 		public ISchema Schema => new InputSchema()
 			.Property<long>("since", "Unix timestamp in milliseconds. Omit for all logs.");
 
@@ -71,7 +73,7 @@ namespace Nox.Control.Runtime.Handlers  {
 				Message   = StripRichText(message),
 				Timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
 			};
-			foreach (var c in Main.Server.GetClients())
+			foreach (var c in Main.Server.GetAuthorizedClients("logger:read"))
 				c.Send("logger_log", entry)
 				.Forget();
 		}
@@ -83,7 +85,7 @@ namespace Nox.Control.Runtime.Handlers  {
 				Message  = message,
 				Progress = progress
 			};
-			foreach (var c in Main.Server.GetClients())
+			foreach (var c in Main.Server.GetAuthorizedClients("logger:read"))
 				c.Send("logger_progress", data)
 				.Forget();
 		}

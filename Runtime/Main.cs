@@ -11,9 +11,11 @@ using Nox.CCK.Mods.Events;
 using Nox.CCK.Mods.Initializers;
 using Nox.CCK.Utils;
 using Nox.Control.Runtime.Handlers;
+using Nox.Control.Runtime.Permissions;
 using Nox.Control.Runtime.Server;
 using Nox.Control.Server;
 using EventHandler = Nox.Control.Runtime.Handlers.EventHandler;
+using Nox.CCK.Language;
 
 namespace Nox.Control.Runtime {
 	public class Main : IMainModInitializer, IControlAPI {
@@ -26,6 +28,7 @@ namespace Nox.Control.Runtime {
 		private EventSubscription[] _events = Array.Empty<EventSubscription>();
 
 		private LoggerHandler _logger;
+		private LanguagePack _pack;
 
 		private (uint, IOperator)[] _operators = Array.Empty<(uint, IOperator)>();
 
@@ -46,6 +49,11 @@ namespace Nox.Control.Runtime {
 				(0u, new ModList()),
 				(0u, new ModGet()),
 				(0u, _logger),
+				(0u, new PermissionList()),
+				(0u, new PermissionGrant()),
+				(0u, new PermissionDeny()),
+				(0u, new PermissionRevoke()),
+				(0u, new PermissionGet()),
 				#if UNITY_EDITOR
 				(0u, new EditorGetPlayState()),
 				(0u, new EditorPlay()),
@@ -58,6 +66,17 @@ namespace Nox.Control.Runtime {
 
 			ReloadAsync().Forget();
 			_logger.Listen();
+
+			// Register the permission localization pack
+			_pack = api.AssetAPI.GetAsset<LanguagePack>("lang.asset");
+			LanguageManager.AddPack(_pack);
+
+			// Subscribe to permission updates to refresh settings
+			PermissionEvents.OnPermissionRequest.AddListener(_ => PermissionSettingsManager.Refresh());
+			PermissionEvents.OnPermissionDecision.AddListener(_ => PermissionSettingsManager.Refresh());
+
+			PermissionSettingsManager.Refresh();
+
 			_events = new[] {
 				api.EventAPI.Subscribe(null, EventHandler.OnEvent)
 			};
@@ -78,7 +97,7 @@ namespace Nox.Control.Runtime {
 			var address        = IPAddress.Parse(cfg.Get("settings.control.address", IPAddress.Any.ToString()));
 			var preferredPort  = cfg.Get("settings.control.port", 8000);
 			var port           = IsUsablePort(preferredPort, GetFreePort());
-			var mcpEnabled     = cfg.Get("settings.control.mcp", true);
+			var mcpEnabled     = cfg.Get("settings.control.mcp", false);
 
 			Server = new WebSocket(address, port, enableMcp: mcpEnabled);
 
@@ -158,6 +177,12 @@ namespace Nox.Control.Runtime {
 					CoreAPI.EventAPI.Unsubscribe(sub);
 				_logger?.Dispose();
 
+				// Remove permission settings
+				PermissionSettingsManager.Remove();
+
+				// Remove language pack
+				LanguageManager.RemovePack(_pack);
+
 				// Unregister all operators
 				for (var i = 0; i < _operators.Length; i++)
 					_manager.Unregister(_operators[i].Item1);
@@ -166,18 +191,19 @@ namespace Nox.Control.Runtime {
 				Http?.Stop();
 				Http = null;
 
-				if (Server != null) {
-					var port = Server.GetPort();
+				if (Server == null)
+					return;
+				
+				var port = Server.GetPort();
 
-					// Remove all listeners before disposing to avoid calls during dispose
-					Server.OnClientConnected.RemoveAllListeners();
-					Server.OnClientDisconnected.RemoveAllListeners();
-					Server.OnEventReceived.RemoveAllListeners();
+				// Remove all listeners before disposing to avoid calls during dispose
+				Server.OnClientConnected.RemoveAllListeners();
+				Server.OnClientDisconnected.RemoveAllListeners();
+				Server.OnEventReceived.RemoveAllListeners();
 
-					Server.Dispose();
-					CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port}");
-					Server = null;
-				}
+				Server.Dispose();
+				CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port}");
+				Server = null;
 			} catch (Exception ex) {
 				CoreAPI?.LoggerAPI.LogError($"Error disposing Control Server: {ex.Message}");
 			} finally {
@@ -248,5 +274,6 @@ namespace Nox.Control.Runtime {
 				return 8000 + new Random().Next(1000, 9999);
 			}
 		}
+
 	}
 }

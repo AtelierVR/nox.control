@@ -13,6 +13,7 @@ namespace Nox.Control.Runtime.Handlers {
 	{
 		public string Name => "editor_get_play_state";
 		public string Description => "Check if the game is currently running.";
+		public string[] RequiredPermissions => new[] { "editor:control" };
 		public ISchema Schema => new InputSchema();
 
 		public async UniTask<IOutput> Execute(IInput _) {
@@ -26,6 +27,7 @@ namespace Nox.Control.Runtime.Handlers {
 	public class EditorPlay : IOperator {
 		public string Name => "editor_play";
 		public string Description => "Enter Unity Play mode.";
+		public string[] RequiredPermissions => new[] { "editor:control" };
 		public ISchema Schema => new InputSchema();
 
 		public async UniTask<IOutput> Execute(IInput _) {
@@ -43,6 +45,7 @@ namespace Nox.Control.Runtime.Handlers {
 	public class EditorStop : IOperator {
 		public string Name => "editor_stop";
 		public string Description => "Exit Unity Play mode.";
+		public string[] RequiredPermissions => new[] { "editor:control" };
 		public ISchema Schema => new InputSchema();
 
 		public async UniTask<IOutput> Execute(IInput _) {

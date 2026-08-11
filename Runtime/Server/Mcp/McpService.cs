@@ -112,6 +112,8 @@ namespace Nox.Control.Runtime.Server.Mcp  {
 				);
 
 				SendResult(request.Id, result);
+			} catch (UnauthorizedAccessException ex) {
+				SendError(request.Id, -32001, $"Unauthorized: {ex.Message}");
 			} catch (KeyNotFoundException) {
 				SendError(request.Id, -32601, $"Method not found: {request.Method}");
 			} catch (ArgumentException ex) {

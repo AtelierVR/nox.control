@@ -9,6 +9,7 @@ namespace Nox.Control.Runtime.Handlers  {
 		public class ModList : IOperator {
 			public string Name => "mods_list";
 			public string Description => "List all loaded mods with their metadata.";
+			public string[] RequiredPermissions => new[] { "mods:read" };
 			public ISchema Schema => new InputSchema();
 
 			public async UniTask<IOutput> Execute(IInput _) {
@@ -72,6 +73,7 @@ namespace Nox.Control.Runtime.Handlers  {
 		public class ModGet : IOperator {
 			public string Name => "mods_get";
 			public string Description => "Get details about a specific mod by its ID.";
+			public string[] RequiredPermissions => new[] { "mods:read" };
 			public ISchema Schema => new InputSchema()
 				.Property<string>("id", "The mod ID to look up.", true);
 

@@ -151,6 +151,18 @@ namespace Nox.Control.Server
 					}
 
 					case "POST" when path.StartsWith("api/call/"):
+					{
+						// Token check
+						var configuredToken = McpDispatcher.GetOrCreateToken();
+						if (!string.IsNullOrEmpty(configuredToken)) {
+							var authHeader = request.Headers["Authorization"];
+							var expected = "Bearer " + configuredToken;
+							if (string.IsNullOrEmpty(authHeader) || !string.Equals(authHeader, expected, StringComparison.Ordinal)) {
+								await WriteJsonAsync(response, 401, JObject.FromObject(new { error = "Unauthorized" }));
+								return;
+							}
+						}
+
 						var operationName = path.Substring("api/call/".Length);
 						var body = await ReadBodyAsync(request);
 						JToken args = null;
@@ -165,6 +177,7 @@ namespace Nox.Control.Server
 							: JObject.FromObject(new { error = "Control API not available" });
 						await WriteJsonAsync(response, 200, result);
 						break;
+					}
 
 					case "POST" when path == "mcp":
 						await HandleMcpPostAsync(request, response);
@@ -214,6 +227,20 @@ namespace Nox.Control.Server
 
 		private async UniTask HandleMcpPostAsync(HttpListenerRequest request, HttpListenerResponse response)
 		{
+			// Check Authorization header for MCP token
+			var configuredToken = McpDispatcher.GetOrCreateToken();
+			if (!string.IsNullOrEmpty(configuredToken)) {
+				var authHeader = request.Headers["Authorization"];
+				var expected = "Bearer " + configuredToken;
+				if (string.IsNullOrEmpty(authHeader) || !string.Equals(authHeader, expected, StringComparison.Ordinal)) {
+					await WriteJsonAsync(response, 401, JObject.FromObject(new {
+						jsonrpc = "2.0",
+						error = new { code = -32001, message = "Unauthorized: invalid or missing token." }
+					}));
+					return;
+				}
+			}
+
 			var body = await ReadBodyAsync(request);
 			if (string.IsNullOrEmpty(body))
 			{
@@ -246,6 +273,11 @@ namespace Nox.Control.Server
 				return;
 			}
 
+			// Inject token from Authorization header into params for McpDispatcher validation
+			if (!string.IsNullOrEmpty(configuredToken) && mcpRequest.Params is JObject p) {
+				p["token"] = configuredToken;
+			}
+
 			// Notification: no response body per JSON-RPC spec
 			if (mcpRequest.Id == null)
 			{
@@ -263,6 +295,14 @@ namespace Nox.Control.Server
 					jsonrpc = "2.0",
 					id = mcpRequest.Id,
 					result
+				}));
+			}
+			catch (UnauthorizedAccessException ex)
+			{
+				await WriteJsonAsync(response, 200, JObject.FromObject(new {
+					jsonrpc = "2.0",
+					id = mcpRequest.Id,
+					error = new { code = -32001, message = $"Unauthorized: {ex.Message}" }
 				}));
 			}
 			catch (ArgumentException ex)

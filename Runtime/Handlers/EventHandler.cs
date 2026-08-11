@@ -10,7 +10,9 @@ using Nox.CCK.Utils;
 namespace Nox.Control.Runtime.Handlers  {
 	public static class EventHandler {
 		public static void OnEvent(EventData context) {
-			var clients = Main.Server.GetClients();
+			// Only send events to clients with the events:read permission
+			var clients = Main.Server.GetAuthorizedClients("events:read");
+			if (clients.Length == 0) return;
 
 			var data = new List<JToken>();
 

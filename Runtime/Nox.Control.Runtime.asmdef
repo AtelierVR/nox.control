@@ -7,6 +7,9 @@
         "Nox.Network",
         "Nox.Control",
         "Nox.CCK.Control",
+        "Nox.CCK.Settings",
+        "Nox.Settings",
+        "Nox.UI",
         "Newtonsoft.Json"
     ],
     "includePlatforms": [],

@@ -25,9 +25,9 @@ namespace Nox.Control.Runtime.Server {
 		/// <summary>
 		/// Whether the MCP endpoint (/mcp) is enabled on this server.
 		/// </summary>
-		public bool EnableMcp { get; set; } = true;
+		public bool EnableMcp { get; set; } = false;
 
-	public WebSocket(IPAddress address, int port, bool enableMdns = true, string mdnsServiceName = "Nox Control Server", bool enableMcp = true) {
+	public WebSocket(IPAddress address, int port, bool enableMdns = true, string mdnsServiceName = "Nox Control Server", bool enableMcp = false) {
 		_address         = address.ToString();
 		_port            = port;
 		_enableMdns      = enableMdns;
@@ -132,6 +132,19 @@ namespace Nox.Control.Runtime.Server {
 				.Select(id => _implement.WebSocketServices["/"].Sessions[id])
 				.OfType<Service>()
 				.Select(behavior => behavior.Client as IClient)
+				.Where(client => client != null)
+				.ToArray();
+
+		/// <summary>
+		/// Returns only clients that have the specified permission granted.
+		/// </summary>
+		public IClient[] GetAuthorizedClients(string permission)
+			=> _implement.WebSocketServices["/"]
+				.Sessions.ActiveIDs
+				.Select(id => _implement.WebSocketServices["/"].Sessions[id])
+				.OfType<Service>()
+				.Where(s => s.IsAuthorized && s.Entry.HasPermission(permission))
+				.Select(s => s.Client as IClient)
 				.Where(client => client != null)
 				.ToArray();
 	}

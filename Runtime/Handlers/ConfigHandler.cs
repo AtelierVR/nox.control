@@ -7,6 +7,7 @@ namespace Nox.Control.Runtime.Handlers {
     {
         public string Name => "config_get";
         public string Description => "Get a configuration value by key, or all values if key is '*' or omitted.";
+        public string[] RequiredPermissions => new[] { "config:read" };
         public ISchema Schema => new InputSchema()
             .Property<string>("key", "The configuration key (e.g. 'settings.control.port'), or '*' for all.");
 
@@ -29,6 +30,7 @@ namespace Nox.Control.Runtime.Handlers {
     {
         public string Name => "config_set";
         public string Description => "Set a configuration value.";
+        public string[] RequiredPermissions => new[] { "config:write" };
         public ISchema Schema => new InputSchema()
             .Property<string>("key", "The configuration key.", true)
             .Property<string>("value", "The value to set (any JSON type).", true);
@@ -57,6 +59,7 @@ namespace Nox.Control.Runtime.Handlers {
     {
         public string Name => "config_reload";
         public string Description => "Reload configuration from disk.";
+        public string[] RequiredPermissions => new[] { "config:write" };
         public ISchema Schema => new InputSchema();
 
         public async UniTask<IOutput> Execute(IInput _) {

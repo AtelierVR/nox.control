@@ -17,6 +17,13 @@ namespace Nox.Control
 		/// <summary>Typed input schema for the operation arguments.</summary>
 		ISchema Schema { get; }
 
+		/// <summary>
+		/// The set of permissions required to invoke this operation.
+		/// Empty or null means the operation is always allowed (no authorization needed).
+		/// Examples: new[] {"config:read"}, new[] {"config:write"}, new[] {"editor:control"}.
+		/// </summary>
+		string[] RequiredPermissions { get; }
+
 		/// <summary>Executes the operation with the given arguments and returns a typed result.</summary>
 		UniTask<IOutput> Execute(IInput args);
 	}

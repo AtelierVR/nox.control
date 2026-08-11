@@ -2,6 +2,7 @@
   "name": "Nox.CCK.Control",
   "rootNamespace": "",
   "references": [
+    "Nox.CCK",
     "UniTask",
     "Nox.Control",
     "Newtonsoft.Json"

@@ -17,6 +17,8 @@ namespace Nox.Control.Runtime.Handlers  {
             public string Description
                 => "List all loaded scenes with their indices, names, and paths.";
 
+            public string[] RequiredPermissions => new[] { "hierarchy:read" };
+
             public ISchema Schema => new InputSchema();
 
             public async UniTask<IOutput> Execute(IInput _) {
@@ -73,6 +75,8 @@ namespace Nox.Control.Runtime.Handlers  {
 
             public string Description
                 => "Get a GameObject by its path of entity IDs.";
+
+            public string[] RequiredPermissions => new[] { "hierarchy:read" };
 
             public ISchema Schema => new InputSchema()
                 .Property<int[]>("path", "Path of entity IDs: [sceneIndex, rootGoId, childId, ...]", true);
