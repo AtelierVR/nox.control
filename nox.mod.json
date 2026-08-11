@@ -25,6 +25,9 @@
   "entrypoints": {
     "main": [
       "Nox.Control.Runtime.Main"
+    ],
+    "editor": [
+      "Nox.Control.Editor.PermissionTerminal"
     ]
   },
   "contraints": [

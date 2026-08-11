@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
@@ -98,9 +99,12 @@ namespace Nox.Control.Runtime.Server {
 					SendHelloReject("Invalid or missing token for existing client.");
 					return;
 				}
-				// Update declared permissions and metadata
-				foreach (var p in declaredPerms)
-					Entry.SetPermission(p, PermissionState.Declared);
+				// Update declared permissions and metadata (don't overwrite existing states)
+				foreach (var p in declaredPerms) {
+					var existing = Entry.Permissions?.FirstOrDefault(perm => perm.Id == p);
+					if (existing == null)
+						Entry.SetPermission(p, PermissionState.Declared);
+				}
 				if (clientName != null)
 					Entry.Name = ParseTranslatedString(clientName, $"WebSocket Client - {endpoint}");
 				if (clientDesc != null)
@@ -121,12 +125,6 @@ namespace Nox.Control.Runtime.Server {
 				Entry.Touch(endpoint);
 				RegistredManager.SaveEntryFile(Entry);
 
-				var all = RegistredManager.LoadAll();
-				var idx = all.FindIndex(e => e.Id == ClientId);
-				if (idx >= 0) all[idx] = Entry;
-				else all.Add(Entry);
-				RegistredManager.SaveAllToConfig(all);
-
 				RegistredManager.OnEntryUpdated += OnEntryUpdated;
 				_identified = true;
 
@@ -137,12 +135,6 @@ namespace Nox.Control.Runtime.Server {
 
 			Entry.Touch(endpoint);
 			RegistredManager.SaveEntryFile(Entry);
-
-			var all2 = RegistredManager.LoadAll();
-			var idx2 = all2.FindIndex(e => e.Id == ClientId);
-			if (idx2 >= 0) all2[idx2] = Entry;
-			else all2.Add(Entry);
-			RegistredManager.SaveAllToConfig(all2);
 
 			RegistredManager.OnEntryUpdated += OnEntryUpdated;
 			_identified = true;
@@ -196,43 +188,54 @@ namespace Nox.Control.Runtime.Server {
 
 			var requested = requestedList?.Select(p => p.ToString()).ToArray() ?? Array.Empty<string>();
 			var allowed = new JArray();
+			var pending  = new JArray();
+			var newlyRequested = new List<string>();
 			var rejected = new JArray();
 
 			foreach (var perm in requested) {
-				// Must be in the declared set
 				var declaredIds = Entry.GetPermissionsByState(PermissionState.Declared);
 				var grantedIds = Entry.GetPermissionsByState(PermissionState.Granted);
-				if (!declaredIds.Contains(perm) && !grantedIds.Contains(perm)) {
-					rejected.Add(new JObject { ["id"] = perm, ["reason"] = "Not declared at hello time." });
-					continue;
-				}
+				var deniedIds = Entry.GetPermissionsByState(PermissionState.Denied);
 
-				// Already granted
+				// Already granted → allow immediately
 				if (Entry.HasPermission(perm)) {
 					allowed.Add(perm);
 					continue;
 				}
 
-				// Needs user approval — auto-grant and fire event for settings page
-				Entry.SetPermission(perm, PermissionState.Granted);
-				RegistredManager.SaveEntryFile(Entry);
-				RegistredManager.NotifyEntryUpdated(ClientId);
+				// Denied → reject
+				if (deniedIds.Contains(perm)) {
+					rejected.Add(new JObject { ["id"] = perm, ["reason"] = "Permission denied by admin." });
+					continue;
+				}
 
+				// Declared but not yet granted → pending admin approval
+				if (declaredIds.Contains(perm)) {
+					pending.Add(perm);
+					newlyRequested.Add(perm);
+					continue;
+				}
+
+				// Not declared at all → reject
+				rejected.Add(new JObject { ["id"] = perm, ["reason"] = "Not declared at hello time." });
+			}
+
+			// Fire event for admin to see pending requests
+			if (newlyRequested.Count > 0) {
 				Nox.Control.Runtime.Permissions.PermissionEvents.OnPermissionRequest.Invoke(new Nox.Control.Runtime.Permissions.PermissionRequestEventArgs {
 					ClientId = ClientId,
 					ClientName = Entry.Name,
 					Endpoint = Context.UserEndPoint as System.Net.IPEndPoint,
-					RequestedPermissions = new[] { perm }
+					RequestedPermissions = newlyRequested.ToArray()
 				});
-
-				allowed.Add(perm);
 			}
 
 			try {
 				var msg = new JObject {
 					["event"] = "permission:response",
 					["args"] = new JArray { new JObject {
-						["allowed"] = allowed,
+						["allowed"]  = allowed,
+						["pending"]  = pending,
 						["rejected"] = rejected
 					}}
 				}.ToString(Formatting.None);
@@ -280,10 +283,35 @@ namespace Nox.Control.Runtime.Server {
 		private void OnEntryUpdated(string clientId) {
 			if (clientId != ClientId) return;
 			var updated = RegistredManager.LoadEntryFile(ClientId);
-			if (updated != null)
+			if (updated != null) {
 				Entry = updated;
+				SendPermissionUpdated();
+			}
 		}
 
+
+		/// <summary>
+		/// Sends the current permission state to the connected client.
+		/// </summary>
+		private void SendPermissionUpdated() {
+			if (Entry == null || !IsConnected()) return;
+			try {
+				var granted  = new JArray(Entry.GetPermissionsByState(PermissionState.Granted));
+				var declared = new JArray(Entry.GetPermissionsByState(PermissionState.Declared));
+				var denied   = new JArray(Entry.GetPermissionsByState(PermissionState.Denied));
+				var msg = new JObject {
+					["event"] = "permission:updated",
+					["args"] = new JArray { new JObject {
+						["granted"]  = granted,
+						["declared"] = declared,
+						["denied"]   = denied
+					}}
+				}.ToString(Formatting.None);
+				Context.WebSocket.Send(msg);
+			} catch (Exception ex) {
+				Logger.LogWarning($"Failed to send permission:updated: {ex.Message}", tag: nameof(Service));
+			}
+		}
 		/// <summary>
 		/// Sends a hello rejection and closes the connection.
 		/// </summary>
@@ -373,6 +401,20 @@ namespace Nox.Control.Runtime.Server {
 						if (Entry == null || !required.Any(r => Entry.HasPermission(r))) {
 							await SendPermissionRequired(ev, required);
 							return;
+						}
+					}
+					// Execute the operator and send the result back
+					var input = data is JArray arr && arr.Count > 0 ? arr[0] : new JObject();
+					var result = await Main.Instance.ExecuteAsync(ev, input);
+					if (IsConnected()) {
+						try {
+							var response = new JObject {
+								["event"] = ev,
+								["args"] = new JArray { result }
+							}.ToString(Formatting.None);
+							Context.WebSocket.Send(response);
+						} catch (Exception ex) {
+							Logger.LogWarning($"Failed to send response for {ev}: {ex.Message}", tag: nameof(Service));
 						}
 					}
 				}

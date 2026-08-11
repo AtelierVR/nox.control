@@ -1,0 +1,21 @@
+{
+  "name": "Nox.Control.Editor",
+  "rootNamespace": "Nox.Control.Editor",
+  "references": [
+    "Nox.CCK",
+    "Nox.Editor.Panel",
+    "Nox.Control.Runtime",
+    "Nox.Control"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

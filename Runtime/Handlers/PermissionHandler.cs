@@ -14,10 +14,9 @@ using Nox.Control.Runtime.Registers;
 namespace Nox.Control.Runtime.Handlers {
 	/// <summary>
 	/// Static manager for websocket permission entries.
-	/// Handles persistence to both the global config AND per-websocket files via ConfigAPI.GetFolder().
+	/// Persists each client as a JSON file in ConfigAPI.GetFolder()/known/.
 	/// </summary>
 	public static class RegistredManager {
-		private const string ConfigKey = "settings.control.known_clients";
 
 		/// <summary>
 		/// Fired when a permission entry is updated (granted, denied, revoked).
@@ -87,34 +86,19 @@ namespace Nox.Control.Runtime.Handlers {
 		}
 
 		/// <summary>
-		/// Load all entries from both the global config list and individual files.
-		/// Files take precedence (they are the authoritative per-websocket store).
+		/// Load all entries from individual files.
 		/// </summary>
 		public static List<RegisteredEntry> LoadAll(string configFolder = null) {
 			var folder = configFolder ?? GetDefaultConfigFolder();
 			var result = new List<RegisteredEntry>();
 
-			// Load from global config first (backward compat / fallback)
-			if (Config.Current != null) {
-				var globalEntries = Config.Load().Get<List<RegisteredEntry>>(ConfigKey);
-				if (globalEntries != null)
-					result.AddRange(globalEntries);
-			}
-
-			// Then load from individual files (these take precedence)
 			if (folder != null && Directory.Exists(folder)) {
 				foreach (var file in Directory.GetFiles(folder, "*.json")) {
 					try {
 						var json = File.ReadAllText(file);
 						var entry = JsonConvert.DeserializeObject<RegisteredEntry>(json);
-						if (entry != null) {
-							// Replace global entry if same ID
-							var existing = result.FindIndex(e => e.Id == entry.Id);
-							if (existing >= 0)
-								result[existing] = entry;
-							else
-								result.Add(entry);
-						}
+						if (entry != null)
+						result.Add(entry);
 					} catch {
 						// Skip corrupted files
 					}
@@ -134,9 +118,6 @@ namespace Nox.Control.Runtime.Handlers {
 			entry.SetPermission(permission, PermissionState.Granted);
 			entry.LastConnectedAt = DateTime.UtcNow;
 			SaveEntryFile(entry);
-
-			var all = LoadAll();
-			SaveAllToConfig(all);
 
 			NotifyEntryUpdated(clientId);
 
@@ -164,16 +145,6 @@ namespace Nox.Control.Runtime.Handlers {
 				Decision = Nox.Control.Runtime.Permissions.PermissionDecision.Denied,
 				Permissions = new[] { permission }
 			});
-		}
-
-		/// <summary>
-		/// Save all entries to the global config.
-		/// </summary>
-		public static void SaveAllToConfig(List<RegisteredEntry> entries) {
-			if (entries == null) return;
-			var cfg = Config.Load();
-			cfg.Set(ConfigKey, entries);
-			cfg.Save();
 		}
 
 		/// <summary>
@@ -257,9 +228,6 @@ namespace Nox.Control.Runtime.Handlers {
 			entry.LastConnectedAt = DateTime.UtcNow;
 			RegistredManager.SaveEntryFile(entry);
 
-			var all = RegistredManager.LoadAll(configFolder);
-			RegistredManager.SaveAllToConfig(all);
-
 			RegistredManager.NotifyEntryUpdated(clientId);
 
 			Permissions.PermissionEvents.OnPermissionDecision.Invoke(new Nox.Control.Runtime.Permissions.PermissionDecisionEventArgs {
@@ -324,10 +292,6 @@ namespace Nox.Control.Runtime.Handlers {
 			var configFolder = input.Get<string>("configFolder", false);
 
 			RegistredManager.DeleteEntryFile(clientId, configFolder);
-
-			var all = RegistredManager.LoadAll(configFolder);
-			all.RemoveAll(e => e.Id == clientId);
-			RegistredManager.SaveAllToConfig(all);
 
 			RegistredManager.NotifyEntryUpdated(clientId);
 

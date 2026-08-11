@@ -1,0 +1,20 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
+    <ui:VisualElement style="flex-grow: 1;">
+        <ui:GroupBox class="m-0 p-8 border-b">
+            <ui:VisualElement style="flex-direction: row; align-items: center;">
+                <ui:Label text="Registered Clients" class="text-lg" style="flex-grow: 1;" />
+                <ui:Button text="Refresh" name="refresh" class="large" />
+            </ui:VisualElement>
+        </ui:GroupBox>
+        <ui:ScrollView style="flex-grow: 1;">
+            <ui:VisualElement name="list" style="flex-grow: 1;" />
+            <ui:VisualElement name="empty" style="flex-grow: 1; justify-content: center; display: none;">
+                <ui:GroupBox class="p-8 m-0">
+                    <ui:Label text="No Registered Clients" class="text-lg text-center mb-8" />
+                    <ui:Label text="Connect an external WebSocket client to see it appear here." class="text-center" style="opacity: 0.7;" />
+                </ui:GroupBox>
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>

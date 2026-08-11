@@ -1,0 +1,23 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
+    <ui:VisualElement style="flex-grow: 1; padding: 8px; border-bottom-width: 1px; border-color: rgb(47, 47, 47);">
+        <ui:VisualElement style="flex-direction: row; align-items: center; margin-bottom: 4px;">
+            <ui:Label name="id" text="ID" class="text-lg" style="flex-grow: 1;" />
+            <ui:Label name="status" text="Pending" style="margin-right: 8px;" />
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row; margin-bottom: 4px;">
+            <ui:Label name="name" text="Name" style="opacity: 0.7; margin-right: 12px;" />
+            <ui:Label name="endpoint" text="Endpoint" style="opacity: 0.7; margin-right: 12px;" />
+            <ui:Label name="last-seen" text="Last seen" style="opacity: 0.7;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="perms-container" style="flex-direction: row; flex-wrap: wrap; margin-bottom: 4px;">
+            <!-- Permissions injected dynamically -->
+        </ui:VisualElement>
+        <ui:VisualElement style="flex-direction: row;">
+            <ui:Button name="btn-grant" text="Grant All" class="small" style="margin-right: 4px;" />
+            <ui:Button name="btn-close" text="Close" class="small" style="margin-right: 4px;" />
+            <ui:Button name="btn-revoke" text="Revoke All" class="small" style="margin-right: 4px;" />
+            <ui:Button name="btn-forget" text="Forget" class="small" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
