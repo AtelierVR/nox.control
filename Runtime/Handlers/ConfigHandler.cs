@@ -39,10 +39,9 @@ namespace Nox.Control.Runtime.Handlers {
 			await UniTask.Yield();
 
             var key = args.Get<string>("key", true);
-            var rVal = args.Get<object>("value", true);
-            var val = rVal is Newtonsoft.Json.Linq.JValue jv
-				? jv.Value
-				: rVal?.ToString();
+            var val = args.Get<object>("value", true);
+            if (val is Newtonsoft.Json.Linq.JValue jv)
+                val = jv.Value;
 
             var cfg = Config.Load();
             cfg.Set(key, val);

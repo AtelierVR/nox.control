@@ -99,6 +99,9 @@ namespace Nox.Control.Runtime {
 			var port           = IsUsablePort(preferredPort, GetFreePort());
 			var mcpEnabled     = cfg.Get("settings.control.mcp", false);
 
+			// Ensure the API token is generated at startup (persisted in config)
+			McpDispatcher.GetOrCreateToken();
+
 			Server = new WebSocket(address, port, enableMcp: mcpEnabled);
 
 			Server.OnClientConnected.AddListener(OnClientConnected);

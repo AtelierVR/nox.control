@@ -19,7 +19,7 @@ namespace Nox.Control.Runtime.Settings {
 			_permission = permission;
 			_onChanged = onChanged;
 
-			SetLabelKey("value", clientName, permissionDescription);
+			SetLabelKey($"settings.group.permissions.{clientId}.{permission}.label");
 			if (granted)
 				SetValue(true, notify: false);
 		}
@@ -42,10 +42,19 @@ namespace Nox.Control.Runtime.Settings {
 
 			foreach (var entry in entries) {
 				var clientName = ResolveName(entry.Name);
+
+				// Register the group label (client name) in the dynamic language pack
+				PermissionSettingsLanguagePack.SetGroupLabel(entry.Id, clientName);
+
 				foreach (var perm in entry.Permissions) {
+					var permDesc = RegisteredEntry.GetPermissionDescription(perm.Id);
 					var granted = perm.Type == PermissionState.Granted;
+
+					// Register the permission label in the dynamic language pack
+					PermissionSettingsLanguagePack.SetPermissionLabel(entry.Id, perm.Id, permDesc);
+
 					handlers.Add(new PermissionToggleSetting(entry.Id, perm.Id, clientName,
-						RegisteredEntry.GetPermissionDescription(perm.Id), granted,
+						permDesc, granted,
 						(clientId, permission, value) => {
 							if (value)
 								RegistredManager.GrantPermission(clientId, permission);
@@ -64,6 +73,7 @@ namespace Nox.Control.Runtime.Settings {
 				if (h is IDisposable d)
 					d.Dispose();
 			}
+			PermissionSettingsLanguagePack.Clear();
 		}
 
 		private static string ResolveName(TranslatedString ts) {
