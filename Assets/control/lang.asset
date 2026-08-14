@@ -15,6 +15,10 @@ MonoBehaviour:
   languages:
   - IETF: en-US
     entries:
+    - key: settings.page.permissions.title
+      value: "Permissions Settings"
+    - key: settings.page.permissions.label
+      value: "Permissions"
     - key: permission.config.read.description
       value: "Read application configuration values"
     - key: permission.config.write.description
@@ -33,6 +37,10 @@ MonoBehaviour:
       value: "Manage websocket permissions and control access"
   - IETF: fr-FR
     entries:
+    - key: settings.page.permissions.title
+      value: "Paramètres des permissions"
+    - key: settings.page.permissions.label
+      value: "Permissions"
     - key: permission.config.read.description
       value: "Lire les valeurs de configuration de l'application"
     - key: permission.config.write.description
