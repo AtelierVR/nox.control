@@ -3,6 +3,5 @@
 	<assembly fullname="Nox.CCK.Control" preserve="all" />
 	<assembly fullname="Nox.Control" preserve="all" />
 	<assembly fullname="Nox.Control.Runtime" preserve="all" />
-	<assembly fullname="Nox.Mods.Control" preserve="all" />
 	<assembly fullname="websocket-sharp" preserve="all" />
 </linker>
