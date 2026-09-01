@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -21,16 +22,16 @@ namespace Nox.Control.Server
 		/// </summary>
 		public static string GetOrCreateToken() {
 			var cfg = Config.Load();
-			var token = cfg.Get("settings.control.token", "");
+			var token = cfg.Get("settings.control._token", "");
 			if (!string.IsNullOrEmpty(token))
 				return token;
 
 			// Generate and persist a random token
 			var bytes = new byte[32];
-			using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+			using var rng = RandomNumberGenerator.Create();
 			rng.GetBytes(bytes);
 			token = Convert.ToBase64String(bytes).Replace("/", "_").Replace("+", "-").Replace("=", "");
-			cfg.Set("settings.control.token", token);
+			cfg.Set("settings.control._token", token);
 			cfg.Save();
 			return token;
 		}
