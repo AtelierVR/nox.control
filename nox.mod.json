@@ -33,6 +33,16 @@
   "contraints": [
     {
       "type": "first"
+    },
+    {
+      "type": "after",
+      "id": "settings"
+    }
+  ],
+  "relations": [
+    {
+      "id": "settings",
+      "type": "depends"
     }
   ]
 }
