@@ -34,25 +34,29 @@ namespace Nox.Control.Runtime.Handlers  {
 		public string[] RequiredPermissions => new[] { "logger:read" };
 
 		public ISchema Schema => new InputSchema()
-			.Property<long>("since", "Unix timestamp in milliseconds. Omit for all logs.");
+            .Property<long>("since", "Unix timestamp in milliseconds. Omit for all logs.")
+            .WithPagination();
 
-		public async UniTask<IOutput> Execute(IInput args) {
-			await UniTask.Yield();
+        public async UniTask<IOutput> Execute(IInput args) {
+            await UniTask.Yield();
 
-			var sinceMs = args.Get<long>("since");
-			var since = sinceMs > 0
-				? DateTimeOffset.FromUnixTimeMilliseconds(sinceMs).UtcDateTime
-				: DateTime.MinValue;
+            var sinceMs = args.Get<long>("since");
+            var since = sinceMs > 0
+                ? DateTimeOffset.FromUnixTimeMilliseconds(sinceMs).UtcDateTime
+                : DateTime.MinValue;
 
-			var logs = Logger.History
-				.Where(log => log.Timestamp >= since)
-				.Select(log => new LogEntryData {
-					Type      = log.Type.ToString().ToSnakeCase(),
-					Tag       = log.Tag,
-					Message   = StripRichText(log.Message),
-					Timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
-				}).ToArray();
+            var all = Logger.History
+                .Where(log => log.Timestamp >= since)
+                .Select(log => new LogEntryData {
+                    Type      = log.Type.ToString().ToSnakeCase(),
+                    Tag       = log.Tag,
+                    Message   = StripRichText(log.Message),
+                    Timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
+                }).ToArray();
 
+            // La sortie reste un tableau nu (compatibilité) : offset/limit se contentent
+            // de découper la fenêtre demandée.
+            var logs = Pagination.Read(args).Apply(all, out _);
 			return OperatorOutput.Ok(logs);
 		}
 
