@@ -25,6 +25,14 @@ namespace Nox.CCK.Control
 			});
 			return this;
 		}
+
+		/// <summary>
+		/// Declares the standard <c>offset</c>/<c>limit</c> arguments used to page a large
+		/// result set (see <see cref="Pagination"/>).
+		/// </summary>
+		public InputSchema WithPagination()
+			=> Property<int>("offset", "Index of the first item to return (default 0).")
+				.Property<int>("limit", "Maximum number of items to return; 0 or omitted returns everything.");
 	}
 
 	public class Property : IProperty
