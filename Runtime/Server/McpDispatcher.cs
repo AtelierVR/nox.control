@@ -12,7 +12,8 @@ namespace Nox.Control.Server
 {
 	/// <summary>
 	/// Shared MCP JSON-RPC 2.0 dispatch logic.
-	/// Used by both WebSocket (McpService) and HTTP (HttpService) transports.
+	/// Called by <c>Modules/McpModule</c> (HTTP <c>POST /mcp</c>), the only MCP transport
+	/// since the single-port EmbedIO rewrite (the WebSocket MCP transport no longer exists).
 	/// </summary>
 	public static class McpDispatcher
 	{

@@ -1,7 +1,8 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <linker>
+	<assembly fullname="EmbedIO" preserve="all" />
 	<assembly fullname="Nox.CCK.Control" preserve="all" />
 	<assembly fullname="Nox.Control" preserve="all" />
 	<assembly fullname="Nox.Control.Runtime" preserve="all" />
-	<assembly fullname="websocket-sharp" preserve="all" />
+	<assembly fullname="Swan.Lite" preserve="all" />
 </linker>

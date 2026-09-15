@@ -19,8 +19,7 @@ using Nox.CCK.Language;
 
 namespace Nox.Control.Runtime {
 	public class Main : IMainModInitializer, IControlAPI {
-		internal static WebSocket        Server;
-		internal static HttpService      Http;
+		internal static ControlServer    Server;
 		internal static IMainModCoreAPI  CoreAPI;
 		internal static Main             Instance;
 
@@ -46,6 +45,7 @@ namespace Nox.Control.Runtime {
 				(0u, new ConfigReload()),
 				(0u, new HierarchyScenesList()),
 				(0u, new HierarchyScenesGet()),
+				(0u, new HierarchySearch()),
 				(0u, new ModList()),
 				(0u, new ModGet()),
 				(0u, _logger),
@@ -84,10 +84,7 @@ namespace Nox.Control.Runtime {
 
 		private static async UniTaskVoid ReloadAsync() {
 			if (Server != null) {
-				Http?.Stop();
-				Http = null;
-				Server.Dispose();
-				Server = null;
+				Shutdown("reload");
 
 				// Attendre un peu pour s'assurer que toutes les tâches asynchrones sont terminées
 				await UniTask.Delay(100);
@@ -96,13 +93,13 @@ namespace Nox.Control.Runtime {
 			var cfg            = Config.Load();
 			var address        = IPAddress.Parse(cfg.Get("settings.control.address", IPAddress.Any.ToString()));
 			var preferredPort  = cfg.Get("settings.control.port", 8000);
-			var port           = IsUsablePort(preferredPort, GetFreePort());
+			var port           = ResolvePort(preferredPort);
 			var mcpEnabled     = cfg.Get("settings.control.mcp", false);
 
 			// Ensure the API token is generated at startup (persisted in config)
 			McpDispatcher.GetOrCreateToken();
 
-			Server = new WebSocket(address, port, enableMcp: mcpEnabled);
+			Server = new ControlServer(address, port, enableMcp: mcpEnabled);
 
 			Server.OnClientConnected.AddListener(OnClientConnected);
 			Server.OnClientDisconnected.AddListener(OnClientDisconnected);
@@ -111,11 +108,6 @@ namespace Nox.Control.Runtime {
 			try {
 				Server.Listen();
 				CoreAPI.LoggerAPI.Log($"Control Server started on port {Server.GetPort()}");
-
-				// Start HTTP API on port + 1
-				var httpPort = Config.Load().Get("settings.control.http_port", port + 1);
-				Http = new HttpService(httpPort);
-				Http.Start();
 			} catch (SocketException ex) {
 				CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on port {port}: {ex.Message}");
 
@@ -123,7 +115,7 @@ namespace Nox.Control.Runtime {
 				var freePort = GetFreePort();
 				if (freePort != port) {
 					CoreAPI.LoggerAPI.Log($"Retrying with alternative port {freePort}...");
-					Server = new WebSocket(address, freePort, enableMcp: mcpEnabled);
+					Server = new ControlServer(address, freePort, enableMcp: mcpEnabled);
 					Server.OnClientConnected.AddListener(OnClientConnected);
 					Server.OnClientDisconnected.AddListener(OnClientDisconnected);
 					Server.OnEventReceived.AddListener(OnDataReceived);
@@ -131,10 +123,6 @@ namespace Nox.Control.Runtime {
 					try {
 						Server.Listen();
 						CoreAPI.LoggerAPI.Log($"Control Server started on alternative port {Server.GetPort()}");
-
-						var httpPort = Config.Load().Get("settings.control.http_port", freePort + 1);
-						Http = new HttpService(httpPort);
-						Http.Start();
 					} catch (SocketException retryEx) {
 						CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on alternative port {freePort}: {retryEx.Message}");
 						Server = null;
@@ -191,30 +179,54 @@ namespace Nox.Control.Runtime {
 					_manager.Unregister(_operators[i].Item1);
 				_operators = Array.Empty<(uint, IOperator)>();
 
-				Http?.Stop();
-				Http = null;
-
-				if (Server == null)
-					return;
-				
-				var port = Server.GetPort();
-
-				// Remove all listeners before disposing to avoid calls during dispose
-				Server.OnClientConnected.RemoveAllListeners();
-				Server.OnClientDisconnected.RemoveAllListeners();
-				Server.OnEventReceived.RemoveAllListeners();
-
-				Server.Dispose();
-				CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port}");
-				Server = null;
 			} catch (Exception ex) {
 				CoreAPI?.LoggerAPI.LogError($"Error disposing Control Server: {ex.Message}");
 			} finally {
+				// Dans le finally : même si le démontage ci-dessus a jeté, le socket doit être libéré.
+				Shutdown("dispose");
+
 				CoreAPI  = null;
 				Instance = null;
 				_manager = null;
 			}
 		}
+
+		#region Shutdown
+
+		/// <summary>
+		/// Arrête et libère immédiatement le serveur (HTTP + WebSocket), et oublie l'instance.
+		/// Idempotent : sans serveur actif, ne fait rien.
+		/// <para>
+		/// Appelé au reload de la configuration et au démontage du mod. C'est ce démontage qui
+		/// libère le port : il est garanti avant un reload de domaine par le loader
+		/// (<c>LoaderManager.DisposeSync</c>, branché sur
+		/// <c>AssemblyReloadEvents.beforeAssemblyReload</c> et <c>Application.quitting</c>).
+		/// </para>
+		/// </summary>
+		/// <param name="reason">Origine de l'appel, pour le log.</param>
+		internal static void Shutdown(string reason) {
+			var server = Server;
+			Server = null;
+
+			if (server == null)
+				return;
+
+			try {
+				var port = server.GetPort();
+
+				// Remove all listeners before disposing to avoid calls during dispose
+				server.OnClientConnected.RemoveAllListeners();
+				server.OnClientDisconnected.RemoveAllListeners();
+				server.OnEventReceived.RemoveAllListeners();
+
+				server.Dispose();
+				CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port} ({reason})");
+			} catch (Exception ex) {
+				CoreAPI?.LoggerAPI.LogError($"Failed to stop Control Server ({reason}): {ex.Message}");
+			}
+		}
+
+		#endregion
 
 		#region IControlAPI
 
@@ -249,18 +261,41 @@ namespace Nox.Control.Runtime {
 			}
 		}
 
-		private static int IsUsablePort(int port, int fallbackPort) {
+		/// <summary>
+		/// Retourne le port configuré s'il est libre, sinon un port libre au hasard.
+		/// </summary>
+		/// <param name="preferredPort">Port demandé par la configuration.</param>
+		private static int ResolvePort(int preferredPort) {
+			if (IsUsablePort(preferredPort))
+				return preferredPort;
+
+			var freePort = GetFreePort();
+			Logger.LogWarning(
+				$"Configured port {preferredPort} is busy, using free port {freePort} instead. "
+				+ "Set \"settings.control.port\" to pin the endpoint."
+			);
+			return freePort;
+		}
+
+		/// <summary>
+		/// Teste si un port peut être bindé, avec les mêmes options que le serveur websocket
+		/// (voir <see cref="Server.ControlServer"/>) : sans <c>ReuseAddress</c> la sonde échouerait
+		/// pour un port dont une connexion du run précédent est en TIME_WAIT, alors que le bind
+		/// réel réussirait.
+		/// </summary>
+		private static bool IsUsablePort(int port) {
 			try {
 				var listener = new TcpListener(IPAddress.Any, port);
+				listener.Server.SetSocketOption(
+					SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true
+				);
+
 				listener.Start();
 				listener.Stop();
-				return port;
-			} catch (SocketException ex) {
-				Logger.LogWarning($"Port {port} is not available ({ex.Message}), using fallback port {fallbackPort}");
-				return fallbackPort;
+				return true;
 			} catch (Exception ex) {
-				Logger.LogWarning($"Unable to test port {port} ({ex.Message}), using fallback port {fallbackPort}");
-				return fallbackPort;
+				Logger.Log($"Port {port} is not available ({ex.Message}).");
+				return false;
 			}
 		}
 
