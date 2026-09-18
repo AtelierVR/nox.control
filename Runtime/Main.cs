@@ -92,6 +92,7 @@ namespace Nox.Control.Runtime {
 
 			var cfg            = Config.Load();
 			var address        = IPAddress.Parse(cfg.Get("settings.control.address", IPAddress.Any.ToString()));
+			var listenHost     = cfg.Get("settings.control.listen_host", "localhost");
 			var preferredPort  = cfg.Get("settings.control.port", 8000);
 			var port           = ResolvePort(preferredPort);
 			var mcpEnabled     = cfg.Get("settings.control.mcp", false);
@@ -99,7 +100,12 @@ namespace Nox.Control.Runtime {
 			// Ensure the API token is generated at startup (persisted in config)
 			McpDispatcher.GetOrCreateToken();
 
-			Server = new ControlServer(address, port, enableMcp: mcpEnabled);
+			Server = new ControlServer(
+				address, 
+				port, 
+				listenHost: listenHost, 
+				enableMcp: mcpEnabled
+			);
 
 			Server.OnClientConnected.AddListener(OnClientConnected);
 			Server.OnClientDisconnected.AddListener(OnClientDisconnected);
@@ -115,7 +121,12 @@ namespace Nox.Control.Runtime {
 				var freePort = GetFreePort();
 				if (freePort != port) {
 					CoreAPI.LoggerAPI.Log($"Retrying with alternative port {freePort}...");
-					Server = new ControlServer(address, freePort, enableMcp: mcpEnabled);
+					Server = new ControlServer(
+						address, 
+						freePort, 
+						listenHost: listenHost, 
+						enableMcp: mcpEnabled
+					);
 					Server.OnClientConnected.AddListener(OnClientConnected);
 					Server.OnClientDisconnected.AddListener(OnClientDisconnected);
 					Server.OnEventReceived.AddListener(OnDataReceived);

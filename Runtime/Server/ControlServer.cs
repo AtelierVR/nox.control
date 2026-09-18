@@ -33,6 +33,7 @@ namespace Nox.Control.Runtime.Server {
 	public class ControlServer : IServer {
 		private readonly string _address;
 		private readonly int    _port;
+		private readonly string _listenHost;
 		private readonly bool   _enableMdns;
 		private readonly string _mdnsServiceName;
 
@@ -60,12 +61,14 @@ namespace Nox.Control.Runtime.Server {
 		public ControlServer(
 			IPAddress address,
 			int port,
+			string listenHost = "localhost",
 			bool enableMdns = true,
 			string mdnsServiceName = "Nox Control Server",
 			bool enableMcp = false
 		) {
 			_address         = address.ToString();
 			_port            = port;
+			_listenHost      = listenHost;
 			_enableMdns      = enableMdns;
 			_mdnsServiceName = mdnsServiceName;
 			EnableMcp        = enableMcp;
@@ -73,25 +76,15 @@ namespace Nox.Control.Runtime.Server {
 			_events = new EventModule("/", this);
 
 			_server = new WebServer(o => o
-				.WithUrlPrefix($"http://*:{_port}/")
+				.WithUrlPrefix($"http://{_listenHost}:{_port}/")
 				.WithMode(HttpListenerMode.EmbedIO)
 			);
 
-			// ⚠ L'ORDRE D'ENREGISTREMENT EST L'ORDRE DE RÉSOLUTION.
-			// `WebModuleCollection.DispatchRequestAsync` itère les modules dans l'ordre
-			// d'ajout, s'arrête au premier dont la route matche le chemin demandé, et sort
-			// dès que la requête est traitée.
-			// Or une route racine ("/") matche TOUTES les URLs : `EventModule` monté sur
-			// "/" avale donc /api et /mcp. Comme il ne répond rien pour un chemin != "/"
-			// (son OnRequestAsync retourne sans écrire) tout en étant IsFinalHandler
-			// (sealed), EmbedIO envoie un 200 vide en text/html — ce que le client MCP
-			// rejette avec « Unexpected 200 response for request:  » puis attend
-			// indéfiniment une réponse à `initialize`.
-			// ⇒ les modules à route spécifique DOIVENT être enregistrés avant lui.
-			_server.WithModule(new ApiModule("/api"));   // REST  → "/api/*"
+			_server.WithModule(new PassThroughModule());
+			_server.WithModule(new ApiModule("/api"));
 			if (EnableMcp)
-				_server.WithModule(new McpModule("/mcp")); // MCP → "POST /mcp"
-			_server.WithModule(_events);                 // WebSocket → "/" : catch-all, en DERNIER
+				_server.WithModule(new McpModule("/mcp"));
+			_server.WithModule(_events);
 		}
 
 		public void Listen() {
@@ -103,19 +96,18 @@ namespace Nox.Control.Runtime.Server {
 				Logger.Log($"Started on {_address}:{_port}", tag: nameof(ControlServer));
 
 				// Start mDNS advertising if enabled
-				if (_enableMdns) {
+				if (_enableMdns)
 					try {
 						_mdnsService = new MdnsService(
 							_mdnsServiceName, "_nctrl._tcp", (ushort)_port,
 							$"address={_address}",
-							$"protocol=websocket",
+							$"protocol=http",
 							$"version=1.0"
 						);
 						_mdnsService.Start();
 					} catch (Exception mdnsEx) {
 						Logger.LogError(new Exception("Failed to start mDNS advertising (server will continue without it)", mdnsEx), tag: nameof(ControlServer));
 					}
-				}
 			} catch (Exception ex) {
 				Logger.LogError(new Exception($"Failed to start server on {_address}:{_port}", ex), tag: nameof(ControlServer));
 				throw;
