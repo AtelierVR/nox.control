@@ -10,11 +10,11 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.Control.Runtime.Server {
 	/// <summary>
-	/// Vue « client » d'une connexion WebSocket sur le serveur de contrôle.
+	/// "Client" view of a WebSocket connection on the control server.
 	/// <para>
-	/// Contrairement à l'implémentation précédente (un behavior websocket-sharp par socket),
-	/// ce n'est plus l'objet qui porte l'état : il ne fait que relayer vers le module
-	/// <see cref="EventModule"/> et son <see cref="IWebSocketContext"/>.
+	/// Unlike the previous implementation (one websocket-sharp behavior per socket),
+	/// the object no longer carries the state: it only relays to the module
+	/// <see cref="EventModule"/> and its <see cref="IWebSocketContext"/>.
 	/// </para>
 	/// </summary>
 	public class Client : IClient {

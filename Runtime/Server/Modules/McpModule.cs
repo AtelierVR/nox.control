@@ -10,10 +10,10 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.Control.Runtime.Server.Modules {
 	/// <summary>
-	/// Module HTTP du point d'entrée MCP (JSON-RPC 2.0), monté sur <c>/mcp</c>.
+	/// HTTP module of the MCP entry point (JSON-RPC 2.0), mounted on <c>/mcp</c>.
 	/// <para>
-	/// C'est le transport utilisé par les clients MCP (VS Code, etc.) : un seul port pour
-	/// le WebSocket d'évènements, l'API REST et MCP.
+	/// This is the transport used by MCP clients (VS Code, etc.): a single port for
+	/// the events WebSocket, the REST API and MCP.
 	/// </para>
 	/// </summary>
 	internal sealed class McpModule : WebModuleBase {
@@ -70,21 +70,21 @@ namespace Nox.Control.Runtime.Server.Modules {
 				return;
 			}
 
-			// Injecte le jeton (validé ci-dessus) dans les params pour le dispatcher
+			// Inject the token (validated above) into the params for the dispatcher
 			if (request.Params is JObject p)
 				p["token"] = McpDispatcher.GetOrCreateToken();
 
-			// Notification : pas de corps de réponse (spec JSON-RPC)
+			// Notification: no response body (JSON-RPC spec)
 			if (request.Id == null) {
 				context.Response.SetEmptyResponse(202);
 				return;
 			}
 
 			try {
-				// Les requêtes arrivées par EmbedIO s'exécutent sur un thread du pool : les
-				// opérateurs et McpDispatcher touchent des API Unity (ex. Application.productName
-				// dans `initialize`), qui exigent le thread principal.
-				// C'est ce que faisait l'ancien transport MCP en WebSocket.
+				// Requests coming through EmbedIO run on a thread-pool thread: operators
+				// and McpDispatcher touch Unity APIs (e.g. Application.productName inside
+				// `initialize`), which require the main thread.
+				// This is what the previous WebSocket MCP transport did.
 				await UniTask.SwitchToMainThread();
 
 				var result = await McpDispatcher.DispatchAsync(request.Method, request.Params);
@@ -121,7 +121,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			}
 		}
 
-		/// <summary>Requête JSON-RPC 2.0 telle qu'envoyée par un client MCP.</summary>
+		/// <summary>JSON-RPC 2.0 request as sent by an MCP client.</summary>
 		private class JsonRpcRequest {
 			[JsonProperty("jsonrpc")] public string JsonRpc { get; set; }
 			[JsonProperty("id")]      public object Id      { get; set; }

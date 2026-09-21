@@ -14,20 +14,20 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.Control.Runtime.Server {
 	/// <summary>
-	/// Serveur de contrôle : <b>un seul port</b> pour tout, via EmbedIO.
+	/// Control server: <b>a single port</b> for everything, through EmbedIO.
 	/// <list type="bullet">
-	///   <item><description>WebSocket d'évènements sur <c>/</c> (voir <see cref="EventModule"/>)</description></item>
-	///   <item><description>API REST sur <c>/api/*</c> (voir <see cref="ApiModule"/>)</description></item>
-	///   <item><description>MCP JSON-RPC sur <c>POST /mcp</c> (voir <see cref="McpModule"/>)</description></item>
+	///   <item><description>Events WebSocket on <c>/</c> (see <see cref="EventModule"/>)</description></item>
+	///   <item><description>REST API on <c>/api/*</c> (see <see cref="ApiModule"/>)</description></item>
+	///   <item><description>MCP JSON-RPC on <c>POST /mcp</c> (see <see cref="McpModule"/>)</description></item>
 	/// </list>
 	/// <para>
-	/// Les routes sont disjointes, ce qui évite toute ambiguïté de résolution entre modules
-	/// (contrairement à deux serveurs sur deux ports, le client n'a qu'une adresse à connaître).
+	/// The routes are disjoint, which avoids any resolution ambiguity between modules
+	/// (unlike two servers on two ports, the client only has one address to know).
 	/// </para>
 	/// <para>
-	/// EmbedIO écoute le socket lui-même (<c>HttpListenerMode.EmbedIO</c>) : plus de
-	/// <c>HttpListener</c>, donc plus besoin du <c>netsh http add urlacl</c> qu'exigeait
-	/// l'ancienne API HTTP séparée.
+	/// EmbedIO listens on the socket itself (<c>HttpListenerMode.EmbedIO</c>): no more
+	/// <c>HttpListener</c>, hence no longer needing the <c>netsh http add urlacl</c> that
+	/// the previous separate HTTP API required.
 	/// </para>
 	/// </summary>
 	public class ControlServer : IServer {
@@ -43,16 +43,16 @@ namespace Nox.Control.Runtime.Server {
 		private MdnsService _mdnsService;
 		private bool        _isRunning;
 
-		/// <summary>Vrai pendant la fermeture : les callbacks doivent alors ne plus rien émettre.</summary>
+		/// <summary>True while shutting down: callbacks must then emit nothing.</summary>
 		public bool IsDisposing;
 
 		public readonly UnityEvent<Client>                   OnClientConnected    = new();
 		public readonly UnityEvent<Client>                   OnClientDisconnected = new();
 
 		/// <summary>
-		/// Levé pour chaque message reçu d'un client. Conservé pour l'API publique du mod ;
-		/// comme dans l'implémentation précédente, le socket d'évènements exécute lui-même
-		/// les opérateurs et ne lève pas cet évènement.
+		/// Raised for every message received from a client. Kept for the mod's public API;
+		/// as in the previous implementation, the events socket runs the operators
+		/// itself and does not raise this event.
 		/// </summary>
 		public readonly UnityEvent<Client, string, object[]> OnEventReceived      = new();
 
@@ -137,8 +137,8 @@ namespace Nox.Control.Runtime.Server {
 						Logger.LogError(new Exception("Error disconnecting client", ex), tag: nameof(ControlServer));
 					}
 
-				// Stop the server: EmbedIO dispose libère le socket d'écoute (le port est
-				// rendu immédiatement au système, ce qui évite les conflits au reload suivant).
+				// Stop the server: EmbedIO dispose releases the listening socket (the port is
+				// given back to the system immediately, which avoids conflicts on the next reload).
 				try {
 					_server?.Dispose();
 				} catch (Exception ex) {
@@ -166,16 +166,16 @@ namespace Nox.Control.Runtime.Server {
 			=> _events.GetClients();
 
 		/// <summary>
-		/// Clients identifiés (handshake « hello » validé) disposant de la permission demandée.
+		/// Identified clients (validated "hello" handshake) holding the requested permission.
 		/// </summary>
 		public IClient[] GetAuthorizedClients(string permission)
 			=> _events.GetAuthorizedClients(permission);
 
-		// ── Helpers partagés par les modules HTTP ───────────────────────────────
+		// ── Helpers shared by the HTTP modules ─────────────────────────
 
 		/// <summary>
-		/// Chemin demandé, relatif à la route du module. EmbedIO peut fournir le chemin complet
-		/// ou relatif selon la stratégie de routage : on gère les deux.
+		/// Requested path, relative to the module route. EmbedIO may provide the full
+		/// or the relative path depending on the routing strategy: both are handled.
 		/// </summary>
 		internal static string RelativePath(IHttpContext context, string baseRoute) {
 			var path = context.RequestedPath ?? "/";
@@ -184,13 +184,13 @@ namespace Nox.Control.Runtime.Server {
 			return path.Trim('/');
 		}
 
-		/// <summary>Écrit une réponse JSON (CORS ouvert, comme l'ancienne API HTTP).</summary>
+		/// <summary>Writes a JSON response (CORS wide open, as the previous HTTP API did).</summary>
 		internal static async Task SendJsonAsync(IHttpContext context, int statusCode, JToken data) {
 			context.Response.StatusCode = statusCode;
 			await context.SendStringAsync(data.ToString(Formatting.None), "application/json", Encoding.UTF8);
 		}
 
-		/// <summary>Vrai si la requête porte le jeton d'API attendu (Bearer).</summary>
+		/// <summary>True when the request carries the expected API token (Bearer).</summary>
 		internal static bool IsAuthorized(IHttpContext context) {
 			var configuredToken = McpDispatcher.GetOrCreateToken();
 			if (string.IsNullOrEmpty(configuredToken))

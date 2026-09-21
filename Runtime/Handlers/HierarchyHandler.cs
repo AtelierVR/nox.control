@@ -117,7 +117,7 @@ namespace Nox.Control.Runtime.Handlers  {
                 if (!TryResolve(args.Get<object>("path"), out var target, out var scene, out var sceneIndex, out var error))
                     return OperatorOutput.Error(error);
 
-                // Un chemin d'un seul segment ne désigne que la scène.
+                // A single-segment path designates the scene only.
                 if (target == null)
                     return OperatorOutput.Ok(new HierarchyScene(sceneIndex, scene, pagination));
 
@@ -125,9 +125,9 @@ namespace Nox.Control.Runtime.Handlers  {
             }
 
             /// <summary>
-            /// Résout un chemin en GameObject et en scène. <paramref name="target"/> vaut
-            /// <c>null</c> quand le chemin ne désigne qu'une scène.
-            /// <para>Partagé avec <c>hierarchy_search</c> (option <c>path</c>).</para>
+            /// Resolves a path into a GameObject and a scene. <paramref name="target"/> is
+            /// <c>null</c> when the path designates a scene only.
+            /// <para>Shared with <c>hierarchy_search</c> (the <c>path</c> option).</para>
             /// </summary>
             internal static bool TryResolve(
                 object raw,
@@ -222,7 +222,7 @@ namespace Nox.Control.Runtime.Handlers  {
                     }
                 }
 
-                // DontDestroyOnLoad n'est pas compté dans SceneManager.sceneCount.
+                // DontDestroyOnLoad is not counted in SceneManager.sceneCount.
                 if (Application.isPlaying
                     && string.Equals(SceneExtensions.DontDestroyOnLoad.name, segment.Raw, StringComparison.OrdinalIgnoreCase)) {
                     index = SceneExtensions.DontDestroyOnLoadId;
@@ -258,7 +258,7 @@ namespace Nox.Control.Runtime.Handlers  {
             }
 
             /// <summary>
-            /// Un segment de chemin : soit un ID d'entité, soit un nom de GameObject / scène.
+            /// A path segment: either an entity ID or a GameObject / scene name.
             /// </summary>
             internal readonly struct PathSegment {
                 public readonly string Raw;
@@ -287,11 +287,11 @@ namespace Nox.Control.Runtime.Handlers  {
                     => Raw;
 
                 /// <summary>
-                /// Normalise l'argument <c>path</c>, accepté sous plusieurs formes :
+                /// Normalizes the <c>path</c> argument, accepted in several forms:
                 /// <list type="bullet">
-                ///   <item><description>chemin par noms/IDs : <c>"DontDestroyOnLoad/Hands/RobotHand (L)"</c></description></item>
+                ///   <item><description>path by names/IDs: <c>"DontDestroyOnLoad/Hands/RobotHand (L)"</c></description></item>
                 ///   <item><description>liste d'IDs : <c>"-1/-8910"</c> ou <c>"-1,-8910"</c></description></item>
-                ///   <item><description>tableau d'IDs (clients qui envoient encore <c>int[]</c>)</description></item>
+                ///   <item><description>array of IDs (clients still sending <c>int[]</c>)</description></item>
                 /// </list>
                 /// </summary>
                 public static PathSegment[] Parse(object raw) {
@@ -303,7 +303,7 @@ namespace Nox.Control.Runtime.Handlers  {
                             return ParseText(text.Trim());
                     }
 
-                    // Tableau (JArray, object[], int[], …) → chaque élément est nommé ou identifié.
+                    // Array (JArray, object[], int[], …) → each item is either named or identified.
                     if (raw is IEnumerable list and not string) {
                         var items = new List<PathSegment>();
                         foreach (var item in list) {
@@ -315,7 +315,7 @@ namespace Nox.Control.Runtime.Handlers  {
                         return items.ToArray();
                     }
 
-                    // Valeur scalaire (un seul ID).
+                    // Scalar value (a single ID).
                     return TryId(raw, out var scalar) ? new[] { FromId(scalar) }
                                                       : new[] { FromName(raw.ToString()) };
                 }
@@ -328,7 +328,7 @@ namespace Nox.Control.Runtime.Handlers  {
                     if (TryParseIdList(text, out var ids))
                         return Array.ConvertAll(ids, FromId);
 
-                    // Nom de scène seul : "DontDestroyOnLoad", "OpenME"
+                    // Scene name alone: "DontDestroyOnLoad", "OpenME"
                     if (text.IndexOf('/') < 0)
                         return new[] { FromName(text) };
 
@@ -379,11 +379,11 @@ namespace Nox.Control.Runtime.Handlers  {
         }
 
         /// <summary>
-        /// Recherche des GameObjects par nom et/ou par type de composant, sur toutes les scènes
-        /// chargées (ou une seule via <c>scene</c>).
+        /// Searches GameObjects by name and/or component type, across every loaded
+        /// scene (or a single one through <c>scene</c>).
         /// <para>
-        /// Chaque résultat expose un <c>path</c> directement réutilisable dans
-        /// <c>hierarchy_get</c>, ce qui évite de naviguer ID par ID.
+        /// Each result exposes a <c>path</c> directly reusable in
+        /// <c>hierarchy_get</c>, which avoids navigating ID by ID.
         /// </para>
         /// </summary>
         public class HierarchySearch : IOperator {
@@ -437,7 +437,7 @@ namespace Nox.Control.Runtime.Handlers  {
                 var withComponents = args.Get<bool?>("with_components") ?? true;
                 var pagination     = Pagination.Read(args);
 
-                // Un 'path' seul est valide : il liste le sous-arbre désigné (paginé).
+                // A lone 'path' is valid: it lists the designated subtree (paginated).
                 if (string.IsNullOrWhiteSpace(nameFilter)
                     && string.IsNullOrWhiteSpace(typeFilter)
                     && string.IsNullOrWhiteSpace(pathFilter)
@@ -492,7 +492,7 @@ namespace Nox.Control.Runtime.Handlers  {
                          activeOnly, withComponents, matches);
             }
 
-            /// <summary>Chemin absolu (noms) du parent, ou <c>null</c> si c'est une racine de scène.</summary>
+            /// <summary>Absolute (names) path of the parent, or <c>null</c> for a scene root.</summary>
             private static string BuildParentPath(Transform transform, string sceneName) {
                 if (transform == null)
                     return null;
@@ -536,8 +536,8 @@ namespace Nox.Control.Runtime.Handlers  {
             private static List<Type> _componentTypes;
 
             /// <summary>
-            /// Résout un filtre de composant sur les types chargés : nom simple, nom complet,
-            /// ou suffixe de nom complet. Un type de base matche ensuite aussi ses dérivés, via
+            /// Resolves a component filter against the loaded types: simple name, full name,
+            /// or full-name suffix. A base type then also matches its derived types, via
             /// <c>GetComponent(Type)</c>.
             /// </summary>
             private static List<Type> ResolveComponentTypes(string filter, out string error) {
@@ -588,9 +588,9 @@ namespace Nox.Control.Runtime.Handlers  {
 
             #endregion
 
-            #region Scopes (racines de recherche)
+            #region Scopes (search roots)
 
-            /// <summary>Racine de parcours : un GameObject (et son sous-arbre) rattaché à une scène.</summary>
+            /// <summary>Traversal root: a GameObject (and its subtree) attached to a scene.</summary>
             private readonly struct SearchScope {
                 public readonly int        SceneIndex;
                 public readonly string     SceneName;
@@ -604,8 +604,8 @@ namespace Nox.Control.Runtime.Handlers  {
             }
 
             /// <summary>
-            /// Détermine les racines à parcourir : le sous-arbre désigné par <paramref name="path"/>
-            /// s'il est fourni, sinon toutes les racines des scènes (éventuellement une seule via
+            /// Determines the roots to traverse: the subtree designated by <paramref name="path"/>
+            /// when provided, otherwise every scene root (optionally a single one via
             /// <paramref name="sceneFilter"/>).
             /// </summary>
             private static bool TryCollectScopes(
@@ -617,7 +617,7 @@ namespace Nox.Control.Runtime.Handlers  {
                 error  = null;
                 scopes = new List<SearchScope>();
 
-                // Départ explicite : un sous-arbre donné par son chemin.
+                // Explicit start: a subtree given by its path.
                 if (!string.IsNullOrWhiteSpace(pathFilter)) {
                     if (!HierarchyScenesGet.TryResolve(pathFilter, out var target, out var scene, out var sceneIndex, out error))
                         return false;
@@ -627,7 +627,7 @@ namespace Nox.Control.Runtime.Handlers  {
                         return true;
                     }
 
-                    // Le chemin ne désigne qu'une scène : on part de ses racines.
+                    // The path designates a scene only: start from its roots.
                     foreach (var root in scene.GetRootGameObjects())
                         scopes.Add(new SearchScope(sceneIndex, scene.name, root));
                     return true;
@@ -689,8 +689,8 @@ namespace Nox.Control.Runtime.Handlers  {
             }
 
             private static string[] DescribeComponents(GameObject gameObject, List<Type> matched) {
-                // Filtre de type actif : on rapporte le type *concret* trouvé (un filtre sur une
-                // classe de base comme 'Collider' doit ressortir en 'BoxCollider', pas 'Collider').
+                // Active type filter: report the *concrete* type found (a filter on a
+                // base class such as 'Collider' must come out as 'BoxCollider', not 'Collider').
                 if (matched != null && matched.Count > 0) {
                     var found = new List<string>(matched.Count);
                     foreach (var type in matched) {
@@ -721,7 +721,7 @@ namespace Nox.Control.Runtime.Handlers  {
             [JsonProperty("name")]
             public string Name = string.Empty;
 
-            /// <summary>Chemin réutilisable tel quel dans <c>hierarchy_get</c>.</summary>
+            /// <summary>Path reusable as-is in <c>hierarchy_get</c>.</summary>
             [JsonProperty("path")]
             public string Path = string.Empty;
 

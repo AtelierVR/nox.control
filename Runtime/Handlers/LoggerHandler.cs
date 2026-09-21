@@ -54,8 +54,8 @@ namespace Nox.Control.Runtime.Handlers  {
                     Timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
                 }).ToArray();
 
-            // La sortie reste un tableau nu (compatibilité) : offset/limit se contentent
-            // de découper la fenêtre demandée.
+            // The output stays a bare array (backward compatibility): offset/limit only
+            // slice the requested window.
             var logs = Pagination.Read(args).Apply(all, out _);
 			return OperatorOutput.Ok(logs);
 		}
