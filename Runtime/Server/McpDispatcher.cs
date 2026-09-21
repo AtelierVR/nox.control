@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using Cysharp.Threading.Tasks;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Nox.CCK.Utils;
 using Nox.Control.Runtime;
@@ -95,15 +94,16 @@ namespace Nox.Control.Server
 					if (string.IsNullOrEmpty(toolName))
 						throw new ArgumentException("Missing tool name");
 
-					var callResult = await Main.Instance.ExecuteAsync(toolName, @params?["arguments"]);
+					var output = await Main.Instance.ExecuteAsync(toolName, @params?["arguments"]);
 
+					// MCP result: content blocks (text, image, audio, resource…)
+					// are passed through as-is, failure goes through `isError` — the JSON-RPC call
+					// itself still succeeds (spec: Trust & Safety / Error Handling).
+					// `structuredContent` mirrors the text block as directly usable JSON.
 					return JObject.FromObject(new {
-						content = new[] {
-							new {
-								type = "text",
-								text = callResult?.ToString(Formatting.None) ?? "null"
-							}
-						}
+						content           = output.ToContent(),
+						isError           = output.IsError,
+						structuredContent = output.ToEnvelope()
 					});
 				}
 

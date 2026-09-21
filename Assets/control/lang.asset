@@ -29,6 +29,12 @@ MonoBehaviour:
       value: "Read loaded mod information"
     - key: permission.editor.control.description
       value: "Control Unity Editor play/stop state"
+    - key: permission.menu.read.description
+      value: "Search Unity Editor menu items"
+    - key: permission.menu.control.description
+      value: "Invoke Unity Editor menu items"
+    - key: permission.screenshot.read.description
+      value: "Capture screenshots from a camera"
     - key: permission.logger.read.description
       value: "Read log history and receive live logs"
     - key: permission.events.read.description
@@ -51,6 +57,12 @@ MonoBehaviour:
       value: "Lire les informations des mods chargés"
     - key: permission.editor.control.description
       value: "Contrôler l'état Play/Stop de l'éditeur Unity"
+    - key: permission.menu.read.description
+      value: "Rechercher les entrées de menu de l'éditeur Unity"
+    - key: permission.menu.control.description
+      value: "Déclencher les entrées de menu de l'éditeur Unity"
+    - key: permission.screenshot.read.description
+      value: "Capturer des captures d'écran depuis une caméra"
     - key: permission.logger.read.description
       value: "Lire l'historique des logs et recevoir les logs en direct"
     - key: permission.events.read.description

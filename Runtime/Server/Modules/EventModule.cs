@@ -15,23 +15,23 @@ using Logger = Nox.CCK.Utils.Logger;
 
 namespace Nox.Control.Runtime.Server.Modules {
 	/// <summary>
-	/// Endpoint WebSocket d'évènements, monté sur le même port que l'API HTTP
+	/// Events WebSocket endpoint, mounted on the same port as the HTTP API
 	/// (voir <see cref="ControlServer"/>).
 	/// <para>
-	/// Le protocole est inchangé par rapport à l'implémentation websocket-sharp précédente :
-	/// handshake « hello » (id, nom, version, jeton), gestion des permissions, puis exécution
-	/// des opérateurs à la demande du client.
+	/// The protocol is unchanged from the previous websocket-sharp implementation:
+	/// "hello" handshake (id, name, version, token), permission handling, then execution
+	/// of operators on the client's request.
 	/// </para>
 	/// <para>
-	/// Différence structurelle : EmbedIO n'instancie qu'<b>un seul</b> module pour toutes les
-	/// connexions (là où websocket-sharp créait un <c>WebSocketBehavior</c> par socket), donc
-	/// tout l'état par client vit dans <see cref="Connection"/>.
+	/// Structural difference: EmbedIO instantiates only <b>one</b> module for all the
+	/// connections (where websocket-sharp created one <c>WebSocketBehavior</c> per socket), so
+	/// all the per-client state lives in <see cref="Connection"/>.
 	/// </para>
 	/// </summary>
 	public class EventModule : WebSocketModule {
 		public ControlServer Server;
 
-		/// <summary>Version du protocole : serveur et client doivent s'accorder.</summary>
+		/// <summary>Protocol version: server and client must agree.</summary>
 		public const int ProtocolVersion = 1;
 
 		private readonly ConcurrentDictionary<string, Connection> _connections = new();
@@ -39,9 +39,9 @@ namespace Nox.Control.Runtime.Server.Modules {
 		public EventModule(string urlPath, ControlServer server) : base(urlPath, true)
 			=> Server = server;
 
-		#region Connexions
+		#region Connections
 
-		/// <summary>État par connexion (ex-état d'instance du behavior websocket-sharp).</summary>
+		/// <summary>Per-connection state (formerly the websocket-sharp behavior's instance state).</summary>
 		private sealed class Connection {
 			public readonly IWebSocketContext Context;
 
@@ -68,7 +68,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 				.Select(c => (IClient)c.Client)
 				.ToArray();
 
-		/// <summary>Clients identifiés (handshake validé) disposant de la permission demandée.</summary>
+		/// <summary>Identified clients (validated handshake) holding the requested permission.</summary>
 		public IClient[] GetAuthorizedClients(string permission)
 			=> _connections.Values
 				.Where(c => c.IsAuthorized && c.Entry.HasPermission(permission))
@@ -76,15 +76,15 @@ namespace Nox.Control.Runtime.Server.Modules {
 				.Where(client => client != null)
 				.ToArray();
 
-		/// <summary>Envoi d'un message texte (interne au module).</summary>
+		/// <summary>Sends a text message (module-internal).</summary>
 		private Task SendToAsync(Connection connection, string payload)
 			=> SendAsync(connection.Context, payload);
 
-		/// <summary>Envoi d'un message texte à une connexion donnée.</summary>
+		/// <summary>Sends a text message to a given connection.</summary>
 		internal Task SendToAsync(IWebSocketContext context, string payload)
 			=> SendAsync(context, payload);
 
-		/// <summary>Fermeture d'une connexion (exposée à <see cref="Client"/>).</summary>
+		/// <summary>Closes a connection (exposed to <see cref="Client"/>).</summary>
 		internal Task CloseAsync(Client client)
 			=> client != null ? CloseAsync(client.Context) : Task.CompletedTask;
 
@@ -116,7 +116,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			if (Server.IsDisposing || connection.Client == null)
 				return;
 
-			// Mémorise la date de dernière connexion
+			// Record the last connection timestamp
 			if (connection.Entry != null) {
 				connection.Entry.LastConnectedAt = DateTime.UtcNow;
 				RegistredManager.SaveEntryFile(connection.Entry);
@@ -139,14 +139,14 @@ namespace Nox.Control.Runtime.Server.Modules {
 				var ev   = json["event"]?.ToString();
 				var data = json["args"] as JArray ?? new JArray();
 
-				// Handshake « hello » : doit être le tout premier message
+				// "hello" handshake: must be the very first message
 				if (ev == "hello") {
 					await UniTask.SwitchToMainThread();
 					HandleHello(connection, data.First as JObject ?? new JObject());
 					return;
 				}
 
-				// Tout le reste exige l'identification
+				// Everything else requires identification
 				if (!connection.Identified) {
 					Logger.LogWarning("Client sent message before hello handshake, closing.", tag: nameof(EventModule));
 					await CloseAsync(context).ConfigureAwait(false);
@@ -155,7 +155,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 
 				await UniTask.SwitchToMainThread();
 
-				// Évènements internes au service
+				// Service-internal events
 				switch (ev) {
 					case "permission:request":
 						HandlePermissionRequest(connection, data.First as JArray ?? new JArray());
@@ -168,7 +168,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 				if (ev == null)
 					return;
 
-				// Porte de permission : l'opération peut exiger une permission précise
+				// Permission gate: the operation may require a specific permission
 				var op       = Main.Instance?.GetRegistered()?.FirstOrDefault(o => o.Name == ev);
 				var required = op?.RequiredPermissions;
 				if (required != null && required.Length > 0) {
@@ -178,7 +178,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 					}
 				}
 
-				// Exécute l'opérateur et renvoie le résultat
+				// Runs the operator and returns the result
 				var input  = data is JArray arr && arr.Count > 0 ? arr[0] : new JObject();
 				var output = await Main.Instance.ExecuteAsync(ev, input);
 
@@ -188,7 +188,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 							connection,
 							new JObject {
 								["event"] = ev,
-								["args"]  = new JArray { output }
+								["args"]  = new JArray { output.ToToken() }
 							}.ToString(Formatting.None)
 						);
 					} catch (Exception ex) {
@@ -203,12 +203,12 @@ namespace Nox.Control.Runtime.Server.Modules {
 
 		#endregion
 
-		#region Protocole
+		#region Protocol
 
 		/// <summary>
 		/// Handshake d'identification. Le client envoie :
 		/// { event: "hello", args: [{ id, name, description, version, token?, permissions }] }
-		/// Un client inconnu reçoit un jeton généré, un client connu doit fournir le sien.
+		/// An unknown client receives a generated token, a known client must provide its own.
 		/// </summary>
 		private void HandleHello(Connection connection, JObject helloArgs) {
 			var endpoint      = connection.Context.RemoteEndPoint?.ToString() ?? "unknown";
@@ -233,18 +233,18 @@ namespace Nox.Control.Runtime.Server.Modules {
 
 			connection.ClientId = clientId;
 
-			// Entrée existante ?
+			// Existing entry?
 			connection.Entry = RegistredManager.LoadEntryFile(clientId);
 			var isReturning = connection.Entry != null;
 
 			if (isReturning) {
-				// Un client connu doit présenter le bon jeton
+				// A known client must present the right token
 				if (string.IsNullOrEmpty(token) || connection.Entry.Token != token) {
 					SendHelloReject(connection, "Invalid or missing token for existing client.");
 					return;
 				}
 
-				// Met à jour les permissions déclarées et les métadonnées (sans écraser les états)
+				// Update the declared permissions and the metadata (without overwriting states)
 				foreach (var p in declaredPerms) {
 					var existing = connection.Entry.Permissions?.FirstOrDefault(perm => perm.Id == p);
 					if (existing == null)
@@ -255,7 +255,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 				if (clientDesc != null)
 					connection.Entry.Description = ParseTranslatedString(clientDesc, $"External control client connected from {endpoint}");
 			} else {
-				// Nouveau client : entrée créée avec un jeton généré
+				// New client: entry created with a generated token
 				var generatedToken = RegistredManager.GenerateToken();
 				connection.Entry = new RegisteredEntry {
 					Id               = clientId,
@@ -283,7 +283,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			SubscribeToEntryUpdates(connection);
 			connection.Identified = true;
 
-			// Client connu : confirmation sans renvoyer le jeton
+			// Known client: confirmation without sending the token back
 			SendHelloOk(connection, null);
 		}
 
@@ -303,7 +303,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			}
 		}
 
-		/// <summary>Accusé de réception du hello (avec le jeton pour un nouveau client).</summary>
+		/// <summary>Acknowledgement of the hello (with the token for a new client).</summary>
 		private void SendHelloOk(Connection connection, string token) {
 			if (!connection.IsConnected) return;
 			try {
@@ -324,7 +324,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 		}
 
 		/// <summary>
-		/// Demande de permissions. Le client envoie :
+		/// Permission request. The client sends:
 		/// { event: "permission:request", args: [["config:read", "hierarchy:read"]] }
 		/// </summary>
 		private void HandlePermissionRequest(Connection connection, JArray requestedList) {
@@ -340,26 +340,26 @@ namespace Nox.Control.Runtime.Server.Modules {
 				var declaredIds = connection.Entry.GetPermissionsByState(PermissionState.Declared);
 				var deniedIds   = connection.Entry.GetPermissionsByState(PermissionState.Denied);
 
-				// Déjà accordée → autorisé immédiatement
+				// Already granted → allowed immediately
 				if (connection.Entry.HasPermission(perm)) {
 					allowed.Add(perm);
 					continue;
 				}
 
-				// Refusée → rejet
+				// Denied → rejected
 				if (deniedIds.Contains(perm)) {
 					rejected.Add(new JObject { ["id"] = perm, ["reason"] = "Permission denied by admin." });
 					continue;
 				}
 
-				// Déclarée mais pas encore accordée → en attente d'un admin
+				// Declared but not yet granted → waiting for an admin
 				if (declaredIds.Contains(perm)) {
 					pending.Add(perm);
 					newlyRequested.Add(perm);
 					continue;
 				}
 
-				// Jamais déclarée → rejet
+				// Never declared → rejected
 				rejected.Add(new JObject { ["id"] = perm, ["reason"] = "Not declared at hello time." });
 			}
 
@@ -386,7 +386,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			}
 		}
 
-		/// <summary>État courant des permissions du client.</summary>
+		/// <summary>Current permission state of the client.</summary>
 		private void HandlePermissionList(Connection connection) {
 			if (connection.Entry == null || !connection.IsConnected) return;
 
@@ -410,7 +410,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			}
 		}
 
-		/// <summary>Appelé quand une entrée est modifiée de l'extérieur (grant/deny/revoke).</summary>
+		/// <summary>Called when an entry is modified from the outside (grant/deny/revoke).</summary>
 		private static void OnEntryUpdated(Connection connection, string clientId) {
 			if (clientId != connection.ClientId) return;
 			var updated = RegistredManager.LoadEntryFile(connection.ClientId);
@@ -420,7 +420,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			SendPermissionUpdated(connection);
 		}
 
-		/// <summary>Envoie l'état des permissions au client connecté.</summary>
+		/// <summary>Sends the permission state to the connected client.</summary>
 		private static void SendPermissionUpdated(Connection connection) {
 			if (connection.Entry == null || !connection.IsConnected) return;
 			try {
@@ -434,7 +434,7 @@ namespace Nox.Control.Runtime.Server.Modules {
 			}
 		}
 
-		/// <summary>Rejette le handshake et ferme la connexion.</summary>
+		/// <summary>Rejects the handshake and closes the connection.</summary>
 		private void SendHelloReject(Connection connection, string reason) {
 			Logger.LogWarning($"Hello rejected: {reason}", tag: nameof(EventModule));
 			try {

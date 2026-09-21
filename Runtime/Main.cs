@@ -54,10 +54,13 @@ namespace Nox.Control.Runtime {
 				(0u, new PermissionDeny()),
 				(0u, new PermissionRevoke()),
 				(0u, new PermissionGet()),
+				(0u, new Screenshot()),
 				#if UNITY_EDITOR
 				(0u, new EditorGetPlayState()),
 				(0u, new EditorPlay()),
 				(0u, new EditorStop()),
+				(0u, new MenuSearch()),
+				(0u, new MenuTrigger()),
 				#endif
 			};
 
@@ -86,7 +89,7 @@ namespace Nox.Control.Runtime {
 			if (Server != null) {
 				Shutdown("reload");
 
-				// Attendre un peu pour s'assurer que toutes les tâches asynchrones sont terminées
+				// Wait a moment to make sure every asynchronous task has finished
 				await UniTask.Delay(100);
 			}
 
@@ -157,7 +160,7 @@ namespace Nox.Control.Runtime {
 				? JToken.FromObject(arg2.Length == 1 ? arg2[0] : arg2)
 				: JObject.Parse("{}");
 			Instance.ExecuteAsync(arg1, jArgs)
-				.ContinueWith(result => arg0.Send(arg1, result).Forget())
+				.ContinueWith(result => arg0.Send(arg1, result.ToToken()).Forget())
 				.Forget();
 		}
 
@@ -193,7 +196,7 @@ namespace Nox.Control.Runtime {
 			} catch (Exception ex) {
 				CoreAPI?.LoggerAPI.LogError($"Error disposing Control Server: {ex.Message}");
 			} finally {
-				// Dans le finally : même si le démontage ci-dessus a jeté, le socket doit être libéré.
+				// In the finally block: even if the teardown above threw, the socket must be released.
 				Shutdown("dispose");
 
 				CoreAPI  = null;
@@ -205,16 +208,16 @@ namespace Nox.Control.Runtime {
 		#region Shutdown
 
 		/// <summary>
-		/// Arrête et libère immédiatement le serveur (HTTP + WebSocket), et oublie l'instance.
-		/// Idempotent : sans serveur actif, ne fait rien.
+		/// Stops and immediately releases the server (HTTP + WebSocket), and forgets the instance.
+		/// Idempotent: with no active server, does nothing.
 		/// <para>
-		/// Appelé au reload de la configuration et au démontage du mod. C'est ce démontage qui
-		/// libère le port : il est garanti avant un reload de domaine par le loader
-		/// (<c>LoaderManager.DisposeSync</c>, branché sur
+		/// Called on configuration reload and on mod teardown. That teardown is what
+		/// releases the port: the loader guarantees it runs before a domain reload
+		/// (<c>LoaderManager.DisposeSync</c>, hooked to
 		/// <c>AssemblyReloadEvents.beforeAssemblyReload</c> et <c>Application.quitting</c>).
 		/// </para>
 		/// </summary>
-		/// <param name="reason">Origine de l'appel, pour le log.</param>
+		/// <param name="reason">Origin of the call, for logging.</param>
 		internal static void Shutdown(string reason) {
 			var server = Server;
 			Server = null;
@@ -254,28 +257,31 @@ namespace Nox.Control.Runtime {
 
 		#endregion
 
-		public async UniTask<JToken> ExecuteAsync(string name, JToken args) {
+		public async UniTask<OperatorOutput> ExecuteAsync(string name, JToken args) {
 			var op = _manager.Operators
 				.Select(o => o.Item2)
 				.FirstOrDefault(o => o.Name == name);
 
 			if (op == null)
-				return JObject.FromObject(new { error = $"Operator '{name}' not found" });
+				return OperatorOutput.Error($"Operator '{name}' not found");
 
             try {
-				var input = new OperatorInput(args);
+				var input  = new OperatorInput(args);
 				var output = await op.Execute(input);
-				return JObject.FromObject(output);
+
+				// OperatorOutput is the reference implementation; a mod may only implement
+				// IOutput, in which case we fall back to a serialized value as-is.
+				return output as OperatorOutput ?? OperatorOutput.Ok(output);
 			} catch (Exception ex) {
 				Logger.LogError($"Operator '{name}' failed: {ex.Message}", tag: nameof(OperationManager));
-				return JObject.FromObject(new { error = ex.Message });
+				return OperatorOutput.Error(ex.Message);
 			}
 		}
 
 		/// <summary>
-		/// Retourne le port configuré s'il est libre, sinon un port libre au hasard.
+		/// Returns the configured port if it is free, otherwise a random free port.
 		/// </summary>
-		/// <param name="preferredPort">Port demandé par la configuration.</param>
+		/// <param name="preferredPort">Port requested by the configuration.</param>
 		private static int ResolvePort(int preferredPort) {
 			if (IsUsablePort(preferredPort))
 				return preferredPort;
@@ -289,10 +295,10 @@ namespace Nox.Control.Runtime {
 		}
 
 		/// <summary>
-		/// Teste si un port peut être bindé, avec les mêmes options que le serveur websocket
-		/// (voir <see cref="Server.ControlServer"/>) : sans <c>ReuseAddress</c> la sonde échouerait
-		/// pour un port dont une connexion du run précédent est en TIME_WAIT, alors que le bind
-		/// réel réussirait.
+		/// Tests whether a port can be bound, with the same options as the websocket server
+		/// (see <see cref="Server.ControlServer"/>): without <c>ReuseAddress</c> the probe would fail
+		/// for a port whose previous run still has a connection in TIME_WAIT, while the actual
+		/// bind would succeed.
 		/// </summary>
 		private static bool IsUsablePort(int port) {
 			try {

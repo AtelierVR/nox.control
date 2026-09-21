@@ -4,15 +4,16 @@ using System.Threading.Tasks;
 using Cysharp.Threading.Tasks;
 using EmbedIO;
 using Newtonsoft.Json.Linq;
+using Nox.CCK.Control;
 
 namespace Nox.Control.Runtime.Server.Modules {
 	/// <summary>
-	/// Module HTTP de l'API REST du serveur de contrôle, monté sur <c>/api</c>.
+	/// HTTP module of the control server's REST API, mounted on <c>/api</c>.
 	/// <list type="bullet">
-	///   <item><description><c>GET  /api</c> — index (version + liste des endpoints)</description></item>
-	///   <item><description><c>GET  /api/tools</c> — opérateurs au format MCP (name/description/inputSchema)</description></item>
-	///   <item><description><c>GET  /api/operations</c> — noms des opérateurs</description></item>
-	///   <item><description><c>POST /api/call/{name}</c> — exécute un opérateur (jeton requis)</description></item>
+	///   <item><description><c>GET  /api</c> — index (version + endpoint list)</description></item>
+	///   <item><description><c>GET  /api/tools</c> — operators in MCP format (name/description/inputSchema)</description></item>
+	///   <item><description><c>GET  /api/operations</c> — operator names</description></item>
+	///   <item><description><c>POST /api/call/{name}</c> — runs an operator (token required)</description></item>
 	/// </list>
 	/// </summary>
 	internal sealed class ApiModule : WebModuleBase {
@@ -82,13 +83,13 @@ namespace Nox.Control.Runtime.Server.Modules {
 						catch { args = new JValue(body); }
 					}
 
-					// Les opérateurs peuvent toucher des API Unity : bascule sur le thread principal.
+					// Operators may touch Unity APIs: switch to the main thread.
 					await UniTask.SwitchToMainThread();
 
 					var result = Main.Instance != null
 						? await Main.Instance.ExecuteAsync(operationName, args)
-						: JObject.FromObject(new { error = "Control API not available" });
-					await ControlServer.SendJsonAsync(context, 200, result);
+						: OperatorOutput.Error("Control API not available");
+					await ControlServer.SendJsonAsync(context, 200, result.ToToken());
 					return;
 				}
 			}
