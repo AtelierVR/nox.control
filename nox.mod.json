@@ -27,7 +27,9 @@
       "Nox.Control.Runtime.Main"
     ],
     "editor": [
-      "Nox.Control.Editor.PermissionTerminal"
+      "Nox.Control.Editor.PermissionTerminal",
+      "Nox.Control.Editor.McpInstallerPanel",
+      "Nox.Control.Editor.Scripting.EditorCodeIntegration"
     ]
   },
   "contraints": [

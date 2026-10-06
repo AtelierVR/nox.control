@@ -70,28 +70,55 @@ namespace Nox.Control.Runtime.Handlers  {
 			Logger.OnLog.AddListener(OnLog);
 		}
 
+		/// <summary>
+		/// Broadcasts a log line to the clients allowed to read the logs.
+		/// <para>
+		/// Never throws: the handler runs inside the <c>Logger.OnLog</c> event, so an exception here
+		/// would break the caller (a NRE during shutdown aborted the server restart, see
+		/// <c>Main.ReloadAsync</c>). With no server — startup, shutdown, failed start, editor — there
+		/// is simply nothing to broadcast to.
+		/// </para>
+		/// </summary>
 		private void OnLog(LogType type, string tag, string message, Object context) {
-			var entry = new LogEntryData {
-				Type      = type.ToString().ToSnakeCase(),
-				Tag       = tag,
-				Message   = StripRichText(message),
-				Timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
-			};
-			foreach (var c in Main.Server.GetAuthorizedClients("logger:read"))
-				c.Send("logger_log", entry)
-				.Forget();
+			try {
+				var clients = Main.Server?.GetAuthorizedClients("logger:read");
+				if (clients == null)
+					return;
+
+				var entry = new LogEntryData {
+					Type      = type.ToString().ToSnakeCase(),
+					Tag       = tag,
+					Message   = StripRichText(message),
+					Timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
+				};
+
+				foreach (var c in clients)
+					c.Send("logger_log", entry)
+						.Forget();
+			} catch {
+				// Ignored on purpose: a broadcast failure must never break the code that logged.
+			}
 		}
 
 		private void OnProgress(bool active, string title, string message, float progress) {
-			var data = new ProgressData {
-				Active   = active,
-				Title    = title,
-				Message  = message,
-				Progress = progress
-			};
-			foreach (var c in Main.Server.GetAuthorizedClients("logger:read"))
-				c.Send("logger_progress", data)
-				.Forget();
+			try {
+				var clients = Main.Server?.GetAuthorizedClients("logger:read");
+				if (clients == null)
+					return;
+
+				var data = new ProgressData {
+					Active   = active,
+					Title    = title,
+					Message  = message,
+					Progress = progress
+				};
+
+				foreach (var c in clients)
+					c.Send("logger_progress", data)
+						.Forget();
+			} catch {
+				// Ignored on purpose (see OnLog).
+			}
 		}
 
 		public void Dispose() {

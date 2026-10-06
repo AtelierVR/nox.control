@@ -44,6 +44,14 @@ namespace Nox.CCK.Control {
 		public static OperatorOutput Ok(object value = null)
 			=> Build(value == null ? new JObject() : JToken.FromObject(value), false);
 
+		/// <summary>
+		/// Success whose content is <b>only</b> the blocks the caller adds: the envelope JSON text block
+		/// is not generated, so the payload is not sent twice (once as text, once as the structured
+		/// value). Use it when the operator publishes its result as content blocks.
+		/// </summary>
+		public static OperatorOutput Blocks(object value = null)
+			=> new(value == null ? new JObject() : JToken.FromObject(value), false);
+
 		/// <summary>Execution failure (not a JSON-RPC protocol error).</summary>
 		public static OperatorOutput Error(string message)
 			=> Build(new JValue(message ?? "Unknown error"), true);
@@ -66,6 +74,14 @@ namespace Nox.CCK.Control {
 		/// <summary>Embedded text file (JSON, log…).</summary>
 		public static OperatorOutput File(string uri, string text, string mimeType = "text/plain", object metadata = null)
 			=> Binary(OutputContent.FromResource(uri, text, mimeType), metadata);
+
+		/// <summary>
+		/// Stream result: the whole stream is read and returned as a content block — an
+		/// <c>image</c>/<c>audio</c> block for a media mime type, an embedded file otherwise. The
+		/// stream is disposed; use <see cref="Link"/> instead for a payload that is already on disk.
+		/// </summary>
+		public static OperatorOutput Stream(System.IO.Stream stream, string mimeType = "application/octet-stream", string uri = null, object metadata = null)
+			=> Binary(OutputContent.FromStream(stream, mimeType, uri), metadata);
 
 		/// <summary>
 		/// Reference to a file already written to disk: the client decides whether to read it,

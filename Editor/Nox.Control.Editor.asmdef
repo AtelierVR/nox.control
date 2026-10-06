@@ -3,9 +3,12 @@
   "rootNamespace": "Nox.Control.Editor",
   "references": [
     "Nox.CCK",
+    "UniTask",
     "Nox.Editor.Panel",
     "Nox.Control.Runtime",
-    "Nox.Control"
+    "Nox.Control",
+    "Nox.CCK.Control",
+    "Newtonsoft.Json"
   ],
   "includePlatforms": [
     "Editor"

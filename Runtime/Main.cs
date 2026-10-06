@@ -93,37 +93,44 @@ namespace Nox.Control.Runtime {
 				await UniTask.Delay(100);
 			}
 
-			var cfg            = Config.Load();
-			var address        = IPAddress.Parse(cfg.Get("settings.control.address", IPAddress.Any.ToString()));
-			var listenHost     = cfg.Get("settings.control.listen_host", "localhost");
-			var preferredPort  = cfg.Get("settings.control.port", 8000);
-			var port           = ResolvePort(preferredPort);
-			var mcpEnabled     = cfg.Get("settings.control.mcp", false);
-
-			// Ensure the API token is generated at startup (persisted in config)
-			McpDispatcher.GetOrCreateToken();
-
-			Server = new ControlServer(
-				address, 
-				port, 
-				listenHost: listenHost, 
-				enableMcp: mcpEnabled
-			);
-
-			Server.OnClientConnected.AddListener(OnClientConnected);
-			Server.OnClientDisconnected.AddListener(OnClientDisconnected);
-			Server.OnEventReceived.AddListener(OnDataReceived);
-
+			// Whole start-up is guarded: a bad value in the config (or a port taken between the
+			// check and the bind) must not escape as an unobserved task exception — the panel
+			// reports the server as stopped instead, and the user can fix the config.
 			try {
-				Server.Listen();
-				CoreAPI.LoggerAPI.Log($"Control Server started on port {Server.GetPort()}");
-			} catch (SocketException ex) {
-				CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on port {port}: {ex.Message}");
+				var address       = ControlConfigs.BindAddress;
+				var listenHost    = ControlConfigs.ListenHost;
+				var preferredPort = ControlConfigs.Port;
+				var mcpEnabled    = ControlConfigs.McpEnabled;
+				var port          = ResolvePort(preferredPort);
 
-				// Try to get a different free port and retry
-				var freePort = GetFreePort();
-				if (freePort != port) {
-					CoreAPI.LoggerAPI.Log($"Retrying with alternative port {freePort}...");
+				// Ensure the API token is generated at startup (persisted in config)
+				McpDispatcher.GetOrCreateToken();
+
+				Server = new ControlServer(
+					address, 
+					port, 
+					listenHost: listenHost, 
+					enableMcp: mcpEnabled
+				);
+
+				Server.OnClientConnected.AddListener(OnClientConnected);
+				Server.OnClientDisconnected.AddListener(OnClientDisconnected);
+				Server.OnEventReceived.AddListener(OnDataReceived);
+
+				try {
+					Server.Listen();
+					LogSafely(LogType.Log, $"Control Server started on port {Server.GetPort()}");
+				} catch (SocketException ex) {
+					LogSafely(LogType.Error, $"Failed to start Control Server on port {port}: {ex.Message}");
+
+					// Try to get a different free port and retry
+					var freePort = GetFreePort();
+					if (freePort == port) {
+						Server = null;
+						return;
+					}
+
+					LogSafely(LogType.Log, $"Retrying with alternative port {freePort}...");
 					Server = new ControlServer(
 						address, 
 						freePort, 
@@ -136,16 +143,15 @@ namespace Nox.Control.Runtime {
 
 					try {
 						Server.Listen();
-						CoreAPI.LoggerAPI.Log($"Control Server started on alternative port {Server.GetPort()}");
+						LogSafely(LogType.Log, $"Control Server started on alternative port {Server.GetPort()}");
 					} catch (SocketException retryEx) {
-						CoreAPI.LoggerAPI.LogError($"Failed to start Control Server on alternative port {freePort}: {retryEx.Message}");
+						LogSafely(LogType.Error, $"Failed to start Control Server on alternative port {freePort}: {retryEx.Message}");
 						Server = null;
-						throw;
 					}
-				} else {
-					Server = null;
-					throw;
 				}
+			} catch (Exception ex) {
+				LogSafely(LogType.Error, $"Control Server could not be started: {ex.Message}");
+				Server = null;
 			}
 		}
 
@@ -208,6 +214,20 @@ namespace Nox.Control.Runtime {
 		#region Shutdown
 
 		/// <summary>
+		/// Restarts the control server so it picks up the current configuration (port, listen host,
+		/// MCP transport). Returns <c>false</c> — without touching anything — when no server is
+		/// running, which is the case in the editor outside play mode: the values are then applied
+		/// at the next start.
+		/// </summary>
+		public static bool RestartIfRunning() {
+			if (Server == null || !Server.IsRunning())
+				return false;
+
+			ReloadAsync().Forget();
+			return true;
+		}
+
+		/// <summary>
 		/// Stops and immediately releases the server (HTTP + WebSocket), and forgets the instance.
 		/// Idempotent: with no active server, does nothing.
 		/// <para>
@@ -234,9 +254,28 @@ namespace Nox.Control.Runtime {
 				server.OnEventReceived.RemoveAllListeners();
 
 				server.Dispose();
-				CoreAPI?.LoggerAPI.Log($"Control Server stopped on port {port} ({reason})");
+				LogSafely(LogType.Log, $"Control Server stopped on port {port} ({reason})");
 			} catch (Exception ex) {
-				CoreAPI?.LoggerAPI.LogError($"Failed to stop Control Server ({reason}): {ex.Message}");
+				LogSafely(LogType.Error, $"Failed to stop Control Server ({reason}): {ex.Message}");
+			}
+		}
+
+		/// <summary>
+		/// Logs through the mod API without ever letting the logging itself throw.
+		/// <para>
+		/// The logger raises an event that other mods (and <c>LoggerHandler</c>) subscribe to: with
+		/// the server already gone, one of those callbacks used to fail and the exception escaped
+		/// the <c>catch</c> above, aborting <c>ReloadAsync</c> before it could rebind the server.
+		/// </para>
+		/// </summary>
+		private static void LogSafely(LogType type, string message) {
+			try {
+				if (type == LogType.Error)
+					CoreAPI?.LoggerAPI.LogError(message);
+				else CoreAPI?.LoggerAPI.Log(message);
+			} catch (Exception e) {
+				// Last resort: the Unity console, which cannot re-enter the mod logger.
+				UnityEngine.Debug.Log($"[nox.control] {message} (logging failed: {e.Message})");
 			}
 		}
 
@@ -289,7 +328,7 @@ namespace Nox.Control.Runtime {
 			var freePort = GetFreePort();
 			Logger.LogWarning(
 				$"Configured port {preferredPort} is busy, using free port {freePort} instead. "
-				+ "Set \"settings.control.port\" to pin the endpoint."
+				+ $"Set \"{ControlConfigs.PortKey}\" to pin the endpoint."
 			);
 			return freePort;
 		}

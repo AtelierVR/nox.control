@@ -1,0 +1,22 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <!-- Template for one MCP client. The styles come from the panel that clones this tree. -->
+    <ui:VisualElement style="flex-grow: 1; padding-top: 4px; padding-bottom: 4px; border-bottom-width: 1px; border-color: rgb(47, 47, 47);">
+        <!-- Badges sit above the title: they keep their place whatever the name length is. -->
+        <ui:VisualElement class="flex-row flex-wrap mb-4">
+            <ui:Label name="status" class="badge" style="margin-left: 0;" />
+            <ui:Label name="detected" class="badge badge-muted" />
+        </ui:VisualElement>
+
+        <ui:Label name="name" class="text-lg text-ellipsis" />
+        <ui:Label name="path" class="text-ellipsis" style="opacity: 0.7;" />
+
+        <ui:VisualElement class="flex-row flex-wrap mt-4">
+            <ui:Button name="install" class="large me-8 mb-4" />
+            <ui:Button name="uninstall" text="Uninstall" class="large me-8 mb-4" />
+            <ui:Button name="copy" text="Copy entry" class="large me-8 mb-4" tooltip="Copy the JSON entry as this client expects it." />
+            <ui:Button name="reveal" text="Reveal file" class="large me-8 mb-4" tooltip="Show the configuration file in the file explorer." />
+        </ui:VisualElement>
+
+        <ui:Label name="hint" class="subtitle" />
+    </ui:VisualElement>
+</ui:UXML>

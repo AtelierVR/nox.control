@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Newtonsoft.Json.Linq;
 
 namespace Nox.CCK.Control {
@@ -58,6 +59,36 @@ namespace Nox.CCK.Control {
 		/// <summary>Embedded text file.</summary>
 		public static OutputContent FromResource(string uri, string text, string mimeType)
 			=> new(Kind.Resource) { Uri = uri, Text = text ?? string.Empty, MimeType = mimeType };
+
+		/// <summary>
+		/// Reads a stream to its end and returns the block that fits its mime type: an
+		/// <c>image</c>, an <c>audio</c>, or an embedded <c>resource</c> for anything else. This is
+		/// how an operator returns a <b>flux</b> (the stream is disposed).
+		/// </summary>
+		public static OutputContent FromStream(Stream stream, string mimeType = "application/octet-stream", string uri = null) {
+			var bytes = ReadAll(stream);
+			var mime  = string.IsNullOrEmpty(mimeType) ? "application/octet-stream" : mimeType;
+
+			if (mime.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+				return FromImage(bytes, mime);
+
+			if (mime.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+				return FromAudio(bytes, mime);
+
+			return FromResource(uri ?? "stream://content", bytes, mime);
+		}
+
+		/// <summary>Reads a stream to its end (null stream gives an empty array).</summary>
+		public static byte[] ReadAll(Stream stream) {
+			if (stream == null)
+				return Array.Empty<byte>();
+
+			using (stream) {
+				using var buffer = new MemoryStream();
+				stream.CopyTo(buffer);
+				return buffer.ToArray();
+			}
+		}
 
 		/// <summary>
 		/// Reference to a resource: the client fetches it itself

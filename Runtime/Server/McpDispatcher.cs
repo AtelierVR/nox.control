@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using Nox.CCK.Utils;
 using Nox.Control.Runtime;
 using UnityEngine;
 
@@ -21,8 +20,7 @@ namespace Nox.Control.Server
 		/// and persists it to config so it survives restarts.
 		/// </summary>
 		public static string GetOrCreateToken() {
-			var cfg = Config.Load();
-			var token = cfg.Get("settings.control._token", "");
+			var token = ControlConfigs.Token;
 			if (!string.IsNullOrEmpty(token))
 				return token;
 
@@ -31,8 +29,7 @@ namespace Nox.Control.Server
 			using var rng = RandomNumberGenerator.Create();
 			rng.GetBytes(bytes);
 			token = Convert.ToBase64String(bytes).Replace("/", "_").Replace("+", "-").Replace("=", "");
-			cfg.Set("settings.control._token", token);
-			cfg.Save();
+			ControlConfigs.SetToken(token);
 			return token;
 		}
 

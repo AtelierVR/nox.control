@@ -1,0 +1,65 @@
+<ui:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Packages/nox.loader/Resources/nox.cck.style.uss?fileID=7433441132597879392&amp;guid=ee18ab989d89a1a479332bd224e51c94&amp;type=3#nox.cck.style" />
+    <Style src="project://database/Packages/nox.cck/Resources/nox.style.uss?fileID=7433441132597879392&amp;guid=956d93e835714844b98277f4fdbd77d3&amp;type=3#nox.style" />
+
+    <ui:VisualElement style="flex-grow: 1;">
+        <ui:ScrollView style="flex-grow: 1;"> 
+            <ui:Foldout name="sec-server" text="Server" value="true" class="section border-b">
+            <!-- Value rows: the field absorbs every width change (flex-basis 0) and the actions keep a
+                 fixed width, so the buttons never slide under the field when the panel is resized. -->
+            <ui:VisualElement class="flex-row align-center mb-4">
+                <ui:Label text="Endpoint" style="min-width: 76px; flex-shrink: 0; opacity: 0.75;" />
+                <ui:TextField name="endpoint" class="large flex-grow flex-shrink flex-basis-0 min-w-64" is-read-only="true" />
+                <ui:Button name="copy-endpoint" text="Copy" class="large w-64" style="flex-shrink: 0;" tooltip="Copy the MCP endpoint URL." />
+            </ui:VisualElement>
+
+                <ui:VisualElement class="flex-row align-center mb-4">
+                    <ui:Label text="Token" style="min-width: 76px; flex-shrink: 0; opacity: 0.75;" />
+                    <ui:TextField name="token" class="large flex-grow flex-shrink flex-basis-0 min-w-64" is-read-only="true" />
+                    <ui:Button name="toggle-token" text="Show" class="large w-64 me-8" style="flex-shrink: 0;" tooltip="Reveal or hide the access token." />
+                    <ui:Button name="copy-token" text="Copy" class="large w-64" style="flex-shrink: 0;" tooltip="Copy the access token." />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="flex-row align-center mt-8">
+                    <ui:VisualElement name="server-dot" class="status-dot is-idle" />
+                    <ui:Label name="server-state" class="flex-grow flex-shrink flex-basis-0 text-wrap" style="opacity: 0.8;" text="Control server: unknown" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="mcp-disabled" class="notification warning hidden mt-8">
+                    <ui:Label class="flex-grow text-wrap" text="The MCP transport is disabled (settings.control.mcp = false): /mcp is rejected. Enable it in Config below: the server will be restarted." />
+                    <ui:Button name="enable-mcp" text="Enable MCP" class="large" style="flex-shrink: 0;" />
+                </ui:VisualElement>
+            </ui:Foldout>
+
+            <ui:Foldout name="sec-config" text="Config" class="section border-b">
+                <!-- Values are read from the Nox config; saving writes them back and restarts the
+                     control server so they apply immediately (no reload needed). -->
+                <ui:VisualElement class="flex-row align-center mb-4">
+                    <ui:Label text="Port" style="min-width: 76px; flex-shrink: 0; opacity: 0.75;" />
+                    <ui:IntegerField name="config-port" class="large flex-grow flex-shrink flex-basis-0 min-w-64" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="flex-row align-center mb-4">
+                    <ui:Label text="Listen host" style="min-width: 76px; flex-shrink: 0; opacity: 0.75;" />
+                    <ui:TextField name="config-host" class="large flex-grow flex-shrink flex-basis-0 min-w-64" tooltip="Host of the listen URL and of the MCP endpoint: localhost, this machine's IP or name (so another machine can reach it), or * to listen on every interface." />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="flex-row align-center mb-4">
+                    <ui:Label text="MCP" style="min-width: 76px; flex-shrink: 0; opacity: 0.75;" />
+                    <ui:Toggle name="config-mcp" class="large" tooltip="Mount the /mcp transport on the control server (applied when the server restarts)." />
+                </ui:VisualElement>
+
+                <!-- Button on the left, state text pushed to the right edge of the panel. -->
+                <ui:VisualElement class="flex-row align-center mt-8">
+                    <ui:Button name="save-config" text="Save &amp; restart server" class="large" style="flex-shrink: 0;" tooltip="Write these values to the Nox config and restart the control server." />
+                    <ui:Label name="config-state" class="flex-grow flex-shrink flex-basis-0 text-wrap text-right ms-8" style="opacity: 0.8;" />
+                </ui:VisualElement>
+            </ui:Foldout>
+
+            <ui:VisualElement class="section">
+                <ui:VisualElement name="clients-list" class="list" />
+                <ui:Label name="no-clients" class="text-center opacity-75 mt-8 hidden" text="No MCP client detected on this machine." />
+            </ui:VisualElement>
+        </ui:ScrollView>
+    </ui:VisualElement>
+</ui:UXML>
