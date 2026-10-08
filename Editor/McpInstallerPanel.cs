@@ -263,9 +263,19 @@ namespace Nox.Control.Editor {
 		/// from the update loop), so the values being typed are never overwritten.
 		/// </summary>
 		private void LoadConfigFields() {
-			_portField?.SetValueWithoutNotify(ControlConfigs.Port);
-			_hostField?.SetValueWithoutNotify(ControlConfigs.ListenHost);
+			// The fields always edit the *config file* values (never the launch-flag override), so
+			// saving cannot silently persist an overridden endpoint.
+			_portField?.SetValueWithoutNotify(ControlConfigs.ConfiguredPort);
+			_hostField?.SetValueWithoutNotify(ControlConfigs.ConfiguredListenHost);
 			_mcpToggle?.SetValueWithoutNotify(ControlConfigs.McpEnabled);
+
+			// The server uses the effective values (override included): warn that the config file is
+			// not what decides while the launch flag is present.
+			var overridden = ControlConfigs.IsEndpointOverridden
+				? $"Overridden for this run by --{ControlConfigs.EndpointArg} (host {ControlConfigs.ListenHost}, port {ControlConfigs.Port})."
+				: null;
+			if (_portField != null) _portField.tooltip = overridden;
+			if (_hostField != null) _hostField.tooltip = overridden;
 		}
 
 		/// <summary>
@@ -273,14 +283,14 @@ namespace Nox.Control.Editor {
 		/// values apply immediately (the port and the /mcp module are only read at startup).
 		/// </summary>
 		private void SaveConfig() {
-			ControlConfigs.Port       = _portField?.value ?? ControlConfigs.Port;
-			ControlConfigs.ListenHost = _hostField?.value ?? ControlConfigs.ListenHost;
+			ControlConfigs.Port       = _portField?.value ?? ControlConfigs.ConfiguredPort;
+			ControlConfigs.ListenHost = _hostField?.value ?? ControlConfigs.ConfiguredListenHost;
 			ControlConfigs.McpEnabled = _mcpToggle?.value ?? ControlConfigs.McpEnabled;
 
 			var restarted = Nox.Control.Runtime.Main.RestartIfRunning();
 
 			Logger.Log(
-				$"MCP config saved (port {ControlConfigs.Port}, host {ControlConfigs.ListenHost}, mcp {ControlConfigs.McpEnabled})"
+				$"MCP config saved (port {ControlConfigs.ConfiguredPort}, host {ControlConfigs.ConfiguredListenHost}, mcp {ControlConfigs.McpEnabled})"
 				+ (restarted ? ": control server restarted." : ": applied when the server starts."),
 				tag: nameof(McpInstallerPanel)
 			);
@@ -315,6 +325,11 @@ namespace Nox.Control.Editor {
 					: McpEndpoint.Port != configured
 						? $"Running on port {McpEndpoint.Port} (the configured port {configured} is busy)."
 						: $"Running on port {McpEndpoint.Port}.";
+
+				// A launch flag wins over the config file: say so, otherwise the fields below look stale.
+				if (ControlConfigs.IsEndpointOverridden)
+					_configState.text += $" Overridden by --{ControlConfigs.EndpointArg}"
+						+ $" (host {ControlConfigs.ListenHost}, port {ControlConfigs.Port}).";
 			}
 		}
 
