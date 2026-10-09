@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Nox.Settings;
 
 namespace Nox.Control.Runtime {
@@ -38,10 +37,8 @@ namespace Nox.Control.Runtime {
 
 			try {
 				var settingApi = Main.CoreAPI?.ModAPI?.GetMod("settings")?.GetInstance<ISettingAPI>();
-				if (settingApi != null) {
-					foreach (var h in _handlers)
-						settingApi.Remove(h.GetPath());
-				}
+				foreach (var h in _handlers)
+					settingApi?.Remove(h.Path);
 			} catch {
 				// Best effort cleanup
 			}

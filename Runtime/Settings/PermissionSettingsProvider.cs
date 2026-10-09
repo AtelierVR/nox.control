@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Nox.CCK.Convertors;
 using Nox.CCK.Settings;
 using Nox.Control.Runtime.Handlers;
@@ -24,8 +23,8 @@ namespace Nox.Control.Runtime.Settings {
 				SetValue(true, notify: false);
 		}
 
-		public override string[] GetPath() => new[] { "permissions", _clientId, _permission };
-		public override int GetOrder() => 0;
+		public override string[] Path => new[] { "permissions", _clientId, _permission };
+		public override int Order => 110000;
 
 		protected override GameObject GetPrefab()
 			=> Nox.Control.Runtime.Main.CoreAPI?.AssetAPI?.GetAsset<GameObject>("settings:prefabs/toggle.prefab");
