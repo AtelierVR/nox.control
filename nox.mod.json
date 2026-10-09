@@ -44,7 +44,9 @@
   "relations": [
     {
       "id": "settings",
-      "type": "depends"
+      "type": "depends",
+      "version": ">=1.0.0",
+      "register": "git+https://github.com/AtelierVR/nox.settings.git"
     }
   ]
 }
