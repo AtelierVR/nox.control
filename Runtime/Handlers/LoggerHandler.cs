@@ -1,8 +1,8 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Cysharp.Threading.Tasks;
 using Nox.CCK.Control;
-using Nox.CCK.Utils;
 using Logger = Nox.CCK.Utils.Logger;
 using LogType = Nox.CCK.Utils.LogType;
 using Object = UnityEngine.Object;
@@ -48,7 +48,7 @@ namespace Nox.Control.Runtime.Handlers  {
             var all = Logger.History
                 .Where(log => log.Timestamp >= since)
                 .Select(log => new LogEntryData {
-                    Type      = log.Type.ToString().ToSnakeCase(),
+                    Type      = TypeName(log.Type),
                     Tag       = log.Tag,
                     Message   = StripRichText(log.Message),
                     Timestamp = new DateTimeOffset(log.Timestamp).ToUnixTimeMilliseconds()
@@ -60,15 +60,37 @@ namespace Nox.Control.Runtime.Handlers  {
 			return OperatorOutput.Ok(logs);
 		}
 
+		private static readonly Regex RichTextRegex = new(@"<[^>]*>");
+
 		private static string StripRichText(string msg) {
-			if (string.IsNullOrEmpty(msg)) return msg;
-			return System.Text.RegularExpressions.Regex.Replace(msg, @"<[^>]*>", "");
+			if (string.IsNullOrEmpty(msg) || msg.IndexOf('<') < 0) return msg;
+			return RichTextRegex.Replace(msg, "");
 		}
 
 		public void Listen() {
 			Logger.OnProgress.AddListener(OnProgress);
 			Logger.OnLog.AddListener(OnLog);
 		}
+
+		/// <summary>
+		/// Snake-cased name of a log type, cached as literals. Building it per log line
+		/// (<c>ToString().ToSnakeCase()</c>) allocated a string plus a StringBuilder and
+		/// went through the culture-aware casing path for an enum that has 6 values.
+		/// </summary>
+		private static string TypeName(LogType type) 
+			=> type switch {
+				LogType.Debug		=> "debug",
+				LogType.Log			=> "log",
+				LogType.Warning		=> "warning",
+				LogType.Error		=> "error",
+				LogType.Assert		=> "assert",
+				LogType.Exception	=> "exception",
+				#if UNITY_EDITOR
+				LogType.Editor		=> "editor",
+				#endif
+				_					=> "log"
+			};
+		
 
 		/// <summary>
 		/// Broadcasts a log line to the clients allowed to read the logs.
@@ -82,11 +104,11 @@ namespace Nox.Control.Runtime.Handlers  {
 		private void OnLog(LogType type, string tag, string message, Object context) {
 			try {
 				var clients = Main.Server?.GetAuthorizedClients("logger:read");
-				if (clients == null)
+				if (clients == null || clients.Length == 0)
 					return;
 
 				var entry = new LogEntryData {
-					Type      = type.ToString().ToSnakeCase(),
+					Type      = TypeName(type),
 					Tag       = tag,
 					Message   = StripRichText(message),
 					Timestamp = new DateTimeOffset(DateTime.UtcNow).ToUnixTimeMilliseconds()
